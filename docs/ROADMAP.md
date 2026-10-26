@@ -1,45 +1,52 @@
-# Validation Roadmap and Evidence Gates
+# Verification Roadmap — NInfer × Strata × Turing GPU Unlock (Windows)
 
-**Repository maturity:** architecture / research kickoff. These gates are proposed; none should be treated as completed merely because a README exists.
+**Status:** planned research. Project-specific gates are not passed by README publication, by green CI, or by upstream performance claims from a different machine.
 
-| Gate | Exit criteria | Status |
-|---|---|---|
-| G0 Hardware baseline | 22 GB modified GPU identified with exact board, driver, CUDA-visible memory, OS build, rollback and integrity checks | Not evidenced here |
-| G1 Native Windows inference | Specific NInfer build + pinned model on real GPU; correctness checks and reproducible baseline latency / throughput | Not evidenced here |
-| G2 Offload prototype | Confirmed compatible memory interface, bounded RAM staging and repeatable prefill/TTFT/decode A/B versus G1 | Not implemented here |
-| G3 Unlock qualification | Independent recovery path, read-only diagnosis, GPU/driver validation and actual-hardware acceptance | Not qualified |
-| G4 Combined A/B | Reproduce A/B/C/D experimental matrix; measure any negative interactions and correctness regressions | Blocked by G2 and G3 |
-| G5 Release | Working Windows package, checksums, supported hardware matrix, attribution/license audit and reproducible evidence | Not started |
+| Gate | What must be established | Status |
+| --- | --- | --- |
+| G0 Target & safety | Identify actual RTX 2080 Ti 22GB TU102, board mod, VRAM, OS, driver, CUDA, baseline health and rollback plan | Not evidenced here |
+| G1 NInfer independent baseline | Windows NInfer fork on physical card; pinned supported 27B model, correct outputs, reproducible 8K/prefill/decode tests | Not evidenced here |
+| G2 Strata independent baseline | Independently supported Windows Strata execution on *this exact device*; pinned MoE model and actual GPU/RAM/SSD traces | Not evidenced here |
+| G3 Coordinated-platform prototype | Safe backend selection, nonconflicting ports, pinned artifacts, shared quality/telemetry schema, distinct model benchmark reports | Not implemented here |
+| G4 Narrow memory integration | Explicitly identify adaptable Strata technique and corresponding *compatible* NInfer model/runtime interfaces; retain numerical correctness | Not demonstrated |
+| G5 GPU unlock experiment | Independent Windows TU102 boot/driver/recovery qualification and relevant FP16 kernel A/B on real card | Not validated |
+| G6 Controlled combined measurements | Matched A/B against appropriate baselines; measured component interactions; record negative and inconclusive results | Blocked |
+| G7 Public release | Reproducible Windows install, compatible models/boards, benchmark evidence, attribution/license review and secure defaults | Not started |
 
-## Evidence standards
+## Reproducibility record
 
-For each test record:
+Record exact Git commit hashes, driver/Windows version, physical board, detected VRAM, toolkit and clock/power settings. For each engine use a pinned model revision/quantization plus integrity hash.
 
-- Date/time, Windows build, GPU board/mod details, detected VRAM, driver/CUDA runtime and power/clock settings.
-- Exact repository commit, binary checksum, NInfer model checksum and quantization.
-- Input length, generated tokens, context-window setting, request concurrency and warm/cold start.
-- Median, spread and tail latency for TTFT; prefill and decode throughput; physical VRAM and host RAM peak use.
-- Instrumented host ↔ device copy duration and bytes; any pinned memory or IO parallelism.
-- Explicit **PASS / FAIL / NOT RUN** for semantic correctness, stability and expected behavior.
-- Comparison against the exact G1 baseline; preserve negative or inconclusive results.
+### Separate measurements per engine
 
-A hosted CI green badge is **not** real-device evidence. A successful Windows compile is **not** proof that a modified GPU works, and a device showing 22 GB is **not** proof that a UEFI unlock has succeeded.
+- NInfer: target dense-model behavior and SM75 kernels of the **local** fork.
+- Strata: supported MoE model behavior and memory residency; separately profile GPU RAM, system RAM, SSD and expert-fetch traffic.
+- Do not cross-compare unlike model families to claim a kernel gain.
+- Both: TTFT, prefill and decode, context semantic correctness, multi-run variance, memory usage, failures.
 
-## Documentation update policy
+### Controlled experiments
 
-Whenever a gate advances:
+1. Baseline backend unchanged, unlock off.
+2. Within-backend memory-policy A/B where the exact backend supports that control.
+3. GPU unlock off/on with the **same model and relevant GEMM ops**, only after G5 hardware safety validation.
+4. Both features only when independent tests show a compatible implementation path.
 
-1. Link the qualifying reproducible logs and source revision, without credentials or sensitive device data.
-2. Update the relevant status row and date.
-3. Keep unsupported workloads documented.
-4. Never replace an unverified claim with a performance headline.
+Run prefill / TTFT / decode and precision/semantic tests. 8K, 32K, 64K and higher contexts are *test candidates*, not demonstrated capabilities.
 
-## Public search / discovery metadata (manual GitHub repository settings)
+## Stop criteria
 
-The GitHub repository owner may set:
+- Cannot run either chosen backend on tested hardware without instability.
+- Any unaccounted model-output/precision regression.
+- Unbounded RAM/SSD traffic, repeatable worse TTFT/decode without a clear capacity tradeoff.
+- No safe Windows recovery or driver's compatibility proof for optional unlock.
+- Unclear redistribution right for included code/binaries.
 
-- Suggested repository name: `rtx-2080ti-22gb-inference-stack`
-- Suggested Description: `Research roadmap for RTX 2080 Ti 22GB local LLM inference combining NInfer, Strata memory offloading and experimental GPU unlock on Windows.`
-- Suggested Topics: `local-llm`, `llm-inference`, `gpu-offloading`, `nvidia`, `cuda`, `windows`, `ninfer`, `strata`, `gpu-unlock`, `rtx-2080-ti`
+## GitHub discovery settings (manual update)
 
-Topic and description edits are **suggestions only** until committed via GitHub's repository settings. Unlike README content, these metadata fields cannot be set through a file commit.
+**Recommended new repository name:** `ninfer-strata-gpu-unlock-rtx2080ti-22gb-windows`
+
+**Repository Description:** `Windows RTX 2080 Ti 22GB research integrating NInfer CUDA SM75, Strata MoE GPU/RAM/SSD offloading and experimental Turing FP16 Tensor Core unlock. Not yet integrated.`
+
+**Suggested Topics:** `ninfer`, `strata`, `gpu-unlock`, `turing-unlock`, `rtx-2080-ti`, `windows`, `cuda`, `sm75`, `llm-inference`, `local-llm`, `moe`, `gpu-offloading`.
+
+**Reminder:** Text in this file is not the GitHub About Description or Topics metadata; the owner must apply those in GitHub repository settings.
