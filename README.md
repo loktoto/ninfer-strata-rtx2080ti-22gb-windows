@@ -1,58 +1,60 @@
-# RTX 2080 Ti 22GB Local LLM Inference Stack — Windows Research
+# NInfer × Strata × Turing GPU Unlock — RTX 2080 Ti 22GB on Windows
 
-**Experimental integration roadmap for NInfer + Strata memory offloading + Turing GPU-unlock research on a modified NVIDIA RTX 2080 Ti 22GB (CUDA SM75).**
+**Experimental Windows local LLM inference research: combine the NInfer CUDA SM75 performance path, Strata's large-model MoE execution and GPU/RAM/SSD expert-tiering design, and independent Turing (TU102) FP16 Tensor Core unlock experiments on a modified NVIDIA RTX 2080 Ti 22GB.**
 
-> **Status: architecture and feasibility research only.** This repository is **not** a working unified inference engine, a one-click installer, a validated GPU unlock, or a benchmarked performance claim. The planned components have different responsibilities and cannot be assumed to work together merely because each exists individually.
+> **Project status: integration research only.** No three-way integrated inference kernel, Windows GPU unlock, performance gain, installable release or extended-context guarantee has been validated in this repository.
 
-繁體中文：呢個專案研究在 **Windows** 上，如何令 **RTX 2080 Ti 22GB** 同時善用 **NInfer 推理運算、Strata 式 GPU/RAM 記憶體分層，以及獨立驗證的 Turing GPU Unlock**。目前只係技術整合規劃，未有可供正式使用嘅整合版本。
+**Proposed GitHub repository name:** `ninfer-strata-gpu-unlock-rtx2080ti-22gb-windows`. **Correct spelling:** `NInfer` (capital letter **I**) / `ninfer` (lowercase); `Nlnfer` with a lowercase **l** is a typo. The repository has **not** been renamed yet.
 
-## Why this project exists
+繁體中文：研究點樣喺 **Windows + 改裝 RTX 2080 Ti 22GB**，發揮 **NInfer CUDA 推理、Strata 的 MoE／GPU-RAM-SSD 分層技術，以及 Turing FP16 Tensor Core Unlock**。唔係聲稱三套系統已合併成功；以兼容性、實卡驗證、推理準確性同效能 A/B 測試作為必要門檻。
 
-A modified 22 GB RTX 2080 Ti can be a useful low-cost local AI device, but an inference backend, memory-tiering system and pre-boot GPU feature-unlock experiment operate at **different layers**. The goal is to establish compatible interfaces and measurements before attempting integration.
+## The three technologies (and their distinct boundaries)
 
-- **Target workload:** local LLM / Qwen inference with reproducible context-window and latency benchmarks.
-- **Target platform:** native Windows first; **NVIDIA Turing / SM75**, focusing on a modified RTX 2080 Ti 22GB.
-- **VRAM policy:** keep the 22 GB target. Use additional system RAM **only if** it provides a measured net benefit for relevant workloads, not as an excuse to reduce the VRAM budget.
-- **Quality policy:** do not publish unverified CUDA support, unlock capability, large-context reliability, or tokens/second.
-
-## Components and ownership
-
-| Component | Intended responsibility | Verified status in *this* repository |
+| Technology | Real role | Status relevant to this project |
 | --- | --- | --- |
-| [NInfer — RTX 2080 Ti 22GB Windows fork](https://github.com/loktoto/ninfer-2080ti-22g-windows) | CUDA SM75 model execution, local serving and measured GPU inference | External development repository; **not integrated here** |
-| Strata / memory-tier research | Profile GPU VRAM, host RAM and transfer costs; experiment with model/KV memory placement only through explicit, compatible interfaces | **Integration not implemented or benchmarked** |
-| [Turing Unlock for Windows](https://github.com/loktoto/Turing-unlock-windows) | Separately test the TU102 / Windows pre-boot unlock research path | Host tests only; **no verified bootable unlock** |
-| This integration repo | Compatibility contract, architecture, reproducible benchmark methodology and integration gates | **Documentation / planning stage** |
+| **[NInfer](https://github.com/Neroued/ninfer)** / [SM75 Windows fork](https://github.com/loktoto/ninfer-2080ti-22g-windows) | A standalone C++/CUDA inference engine; our fork investigates Qwen3.8-27B inference on modified RTX 2080 Ti 22GB / SM75 under Windows | The Windows fork is a development project, **not yet a physically qualified Windows release** |
+| **[Strata](https://github.com/kossum/strata)** | A separate end-to-end local inference engine, with its own model execution, MoE expert placement / GPU-RAM-SSD memory strategy, and Windows support for specified hardware | **Not** a drop-in NInfer memory plugin; compatibility and integration must be proven |
+| **[Turing Unlock for Windows](https://github.com/loktoto/Turing-unlock-windows)** / [Linux upstream](https://github.com/nlzy/turing-unlock) | Independent TU102 feature-unlock research aimed at FP16 Tensor Core throughput; it operates below inference kernels, in the platform/driver boot path | Linux upstream reports device-specific tests; our Windows port has **host-level tests only**, no qualified Windows unlock |
 
-**Critical distinction:** A pre-boot GPU unlock is not an inference CUDA kernel, and a memory-offload mechanism is not automatically compatible with an existing model runtime. Combining them requires driver/firmware qualification, compatible memory ownership and synchronization, and end-to-end Windows testing.
+**Important model distinction:** NInfer's targeted **Qwen3.8-27B** path and Strata's **Qwen3.8-Flash-Next MoE** path are not identical workloads. They must not be benchmarked against each other as if both were the same model or as if Strata's scheduler could simply be plugged into NInfer.
 
-## Planned execution order
+## What "integration" could mean
 
-1. **G0 — Establish a reproducible 22 GB baseline.** Capture exact Windows build, driver, VBIOS/device characteristics and detected VRAM; obtain known-good NInfer 8K inference measurements on an actual physical card.
-2. **G1 — Validate native Windows inference independently.** Reproduce a specific model artifact, build/packaging SHA, model quality checks and stable serving before any memory-tier or unlock change.
-3. **G2 — Prototype optional memory tiering.** Identify the exact API boundary; measure host RAM, PCIe transfer, prefill, TTFT and decode against G1 with no unverifiable throughput claims.
-4. **G3 — Qualify GPU-unlock research *separately*.** Follow read-only diagnostics and recovery gates first; do not require firmware or unlock changes for the baseline path.
-5. **G4 — Compare controlled combinations.** Benchmark baseline, tiering-only, any independently qualified unlock-only mode and finally combined mode **only if** all prerequisite gates pass.
-6. **G5 — Release only after hardware validation.** Ship reproducible scripts, limitations, rollback instructions, licenses/attribution and an evidence-backed compatibility matrix.
+1. **Platform-first (lowest-risk):** a Windows launcher / serving layer selects NInfer or Strata as distinct backends, sharing configuration, benchmarking, model provenance and monitoring. They need not run the same kernel.
+2. **Selective technology integration (research):** identify whether specific memory-tiering / expert placement ideas can be adapted to a *compatible* NInfer runtime and model architecture. Measure real PCIe/host RAM costs, cache behavior, synchronization and correctness. This may be infeasible for some model families.
+3. **GPU unlock A/B (independent and optional):** only after a separately qualified Windows TU102 procedure exists, compare **the same model, kernels and settings** with and without the unlock on an actual device. Do not promise blanket GPU or LLM speedups.
+4. **Combined experiments (last):** try any mutually compatible combinations after all isolated gates pass, report negative outcomes and preserve a no-unlock fallback.
 
-See [Architecture](docs/ARCHITECTURE.md) and [Validation Roadmap](docs/ROADMAP.md).
+This project targets **22 GB VRAM**, not a reduced-VRAM configuration. Host RAM/SSD is a potential capacity tier for larger models, inactive MoE experts or context state, **not automatically a speed improvement**.
 
-## Measurements we will publish when evidence exists
+## What this repository contains
 
-- Exact GPU/driver/Windows/model revision and integrity SHA-256
-- Physical VRAM use, system RAM use, host-device transfer volume and PCIe bottlenecks
-- Time-to-first-token (TTFT), prefill throughput and decode tokens/s; run-to-run variation
-- Repeatable 8K / 32K / 64K context tests **as attempted gates, not promises**
-- Model correctness and any regressions introduced by offload or unlock experiments
-- Separate performance deltas for each component, including negative results
+- [Architecture and compatibility boundaries](docs/ARCHITECTURE.md)
+- [Roadmap, evidence gates and benchmarks](docs/ROADMAP.md)
+- References to the two separate, upstream-derived development repos
 
-## Safety, provenance and licensing
+**No integrated source tree, kernel patch, Windows installer, reliable benchmark, or real-device GPU unlock is currently published here.**
 
-This repo **does not contain a functioning GPU unlocker** and must not be used as a firmware flashing guide. Avoid collecting or committing proprietary firmware dumps, keys, passwords or licensed artifacts. Any future inclusion of upstream code must respect the corresponding original licenses and notices. The NInfer derivative and the Turing-unlock port have distinct licensing obligations; there is **no assumed combined binary license**.
+## What must be demonstrated before making performance claims
 
-## Related repositories
+- Actual modified TU102 / RTX 2080 Ti 22GB board, detected VRAM, Windows build, driver and CUDA compute capability.
+- Separate runnable NInfer and Strata baselines on supported model/driver combinations, with checksums and exact build revisions.
+- Strict model/quantization/input parity for all within-engine A/B tests; independent correctness and 8K/32K/64K semantic-retrieval tests where supported.
+- PCIe copy bytes/time, GPU residency, RAM/SSD I/O, TTFT, prefill tokens/s, decode tokens/s and stability.
+- GPU-unlock and no-unlock results on the **same** model and compute paths, independently of RAM offload; measurements must identify FP16/FP32 accumulate kernel use.
+- Public failure results, recovery gates, license/attribution compliance and rollback steps.
 
-- [NInfer for RTX 2080 Ti 22GB on Windows](https://github.com/loktoto/ninfer-2080ti-22g-windows)
-- [Turing Unlock for Windows — TU102](https://github.com/loktoto/Turing-unlock-windows)
+## Accuracy, safety and licensing
 
-Maintained by [loktoto](https://github.com/loktoto). Contributions should distinguish **implemented**, **tested on CI**, **tested on real hardware**, and **planned**.
+- An upstream Linux TU102 unlock is **not proof of Windows unlock support**. GPU feature unlock experiments may involve hardware/power risk; never infer a general-purpose performance improvement.
+- No confidential firmware dumps, private keys or licensed model artifacts are hosted here.
+- NInfer upstream: **Apache-2.0**; Strata upstream: **MIT**; Turing-unlock upstream: **GPL-2.0-only** according to their respective source repositories. A future distribution must assess each component's license and provenance independently.
+- All proposed optimizations are **hypotheses until independently replicated on physical hardware**.
+
+Maintained by [loktoto](https://github.com/loktoto). Contributions should label each claim **planned / source-built / host-tested / real-hardware-tested**.
+
+## Discoverability
+
+Suggested GitHub Topics: `ninfer`, `strata`, `turing-unlock`, `gpu-unlock`, `rtx-2080-ti`, `windows`, `cuda`, `sm75`, `llm-inference`, `local-llm`, `moe`, `gpu-offloading`.
+
+Repository Description (manual GitHub About field): *Windows RTX 2080 Ti 22GB research integrating NInfer CUDA SM75, Strata MoE GPU/RAM/SSD offloading and experimental Turing FP16 Tensor Core unlock. Not yet integrated.*
