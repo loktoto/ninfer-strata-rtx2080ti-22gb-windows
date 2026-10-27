@@ -29,3 +29,10 @@ FP16 KV and a one-token window, and freezes expert residency for comparisons.
 It rejects conflicting forwarded options. `--dry-run` prints exact arguments
 and controlled environment values without running the engine. Engine and model
 files must exist. Paths are passed as an argument vector with no shell.
+
+The second patch adds `--ninfer-expert-q4k`: selected cached Q4_K gate/up and
+down matrices are borrowed directly from existing expert slots, using the
+existing Q8_1 scratch/output pointers and stream. Q6_K, unsupported shapes and
+all-cached device-ID routing retain native dispatch. No expert bank is created.
+This candidate requires SM75 numerical and same-GGUF validation before use in
+a performance profile; CPU and GPU expert partitioning remain Strata's.

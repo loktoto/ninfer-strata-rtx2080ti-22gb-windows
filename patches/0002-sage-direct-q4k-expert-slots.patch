@@ -1,0 +1,47 @@
+diff --git a/src/poly/engine.cpp b/src/poly/engine.cpp
+index b666db5..aea161d 100644
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -15,6 +15,9 @@
+ #include "runtime.hpp"
+ #include "strata/poly/kernels.hpp"
+ #include "strata/kernels/native_mmvq.hpp"
++#ifdef STRATA_SAGE_EXPERT_Q4K_BACKEND
++#include "sage/strata_expert_q4k.hpp"
++#endif
+ 
+ #include "ggml.h"
+ 
+@@ -2339,6 +2342,14 @@ bool Engine::moe(Layer& L, int il, int n, const std::function<void()>* first) {
+             const size_t ff = (size_t) n_ff_exp_, q8_row = kernels::native_q8_1_bytes(n_ff_exp_);
+             const int per = rows_ >= kSlots ? kSlots : 1;   // the scratch holds rows_ experts' values
+             ScaledRows sum{};
++            const auto mmvq_slots = [&](int type, const kernels::MmvqSlots& slots, int count,
++                                         int n_in, int n_out) {
++#ifdef STRATA_SAGE_EXPERT_Q4K_BACKEND
++                // The adapter borrows the existing slots and scratch; false enqueues nothing.
++                if (sage::strata::try_expert_q4k_slots(type, slots, count, n_in, n_out, st_)) return true;
++#endif
++                return count > 1 && kernels::native_mmvq_slots(type, slots, count, n_in, n_out, st_);
++            };
+             for (int i0 = 0; i0 < n_cached; i0 += per) {
+                 const int m = std::min(per, n_cached - i0);
+                 kernels::MmvqSlots gate_up{}, down{};
+@@ -2351,15 +2362,14 @@ bool Engine::moe(Layer& L, int il, int n, const std::function<void()>* first) {
+                     down.x[j] = (const uint8_t*) q8_ + (size_t) j * q8_row;
+                     down.y[j] = d_ + (size_t) ((i0 + j) % kSumRows) * e_row;
+                 }
+-                const bool one = m > 1 && kernels::native_mmvq_slots((int) L.gu_type, gate_up, m, n_embd_,
+-                                                                      2 * n_ff_exp_, st_);
++                const bool one = mmvq_slots((int) L.gu_type, gate_up, m, n_embd_, 2 * n_ff_exp_);
+                 for (int j = 0; j < m && !one; ++j)
+                     kernels::native_mmvq((int) L.gu_type, gate_up.w[j], gate_up.x[j], gate_up.y[j], n_embd_,
+                                          2 * n_ff_exp_, 1, st_);
+                 if (gelu_) geglu_rows(g_, h_, n_ff_exp_, m, st_);
+                 else swiglu_clamp_rows(g_, h_, n_ff_exp_, m, limit, st_);
+                 kernels::native_quantize_q8_1(h_, q8_, n_ff_exp_, m, st_);
+-                if (!(m > 1 && kernels::native_mmvq_slots((int) L.d_type, down, m, n_ff_exp_, n_embd_, st_)))
++                if (!mmvq_slots((int) L.d_type, down, m, n_ff_exp_, n_embd_))
+                     for (int j = 0; j < m; ++j)
+                         kernels::native_mmvq((int) L.d_type, down.w[j], down.x[j], down.y[j], n_ff_exp_, n_embd_, 1,
+                                              st_);

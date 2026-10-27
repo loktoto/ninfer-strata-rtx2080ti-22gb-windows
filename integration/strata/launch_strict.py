@@ -13,7 +13,8 @@ DEFAULTS = ["--tail-skip", "0", "--skip-weight", "0", "--no-draft", "--lookup", 
             "--window", "1", "--no-graphs", "--kv", "fp16"]
 
 
-def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None):
+def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None,
+                ninfer_expert_q4k=False):
     """Return shell-free argv/environment, rejecting conflicting passthrough flags."""
     extra = list(extra)
     if extra and extra[0] == "--":
@@ -28,7 +29,8 @@ def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None):
         raise ValueError(f"Model file does not exist: {model}")
     env = dict(os.environ if environ is None else environ)
     env.update(STRATA_ROUTE_TAIL_SKIP="0", STRATA_FREEZE_EXPERTS="1",
-               STRATA_SAGE_RMSNORM="1" if ninfer_rmsnorm else "0")
+               STRATA_SAGE_RMSNORM="1" if ninfer_rmsnorm else "0",
+               STRATA_SAGE_EXPERT_Q4K="1" if ninfer_expert_q4k else "0")
     return [str(engine), "--model", str(model), *DEFAULTS, *extra], env
 
 
@@ -38,16 +40,20 @@ def main(argv=None):
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--ninfer-rmsnorm", action="store_true",
                         help="Opt into the experimental NInfer-derived FP32 RMSnorm")
+    parser.add_argument("--ninfer-expert-q4k", action="store_true",
+                        help="Opt into experimental direct Q4_K cached expert-slot products")
     parser.add_argument("--dry-run", action="store_true", help="Print the exact launch without running")
     parser.add_argument("engine_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     try:
-        command, env = launch_spec(args.engine, args.model, args.engine_args, args.ninfer_rmsnorm)
+        command, env = launch_spec(args.engine, args.model, args.engine_args, args.ninfer_rmsnorm,
+                                  ninfer_expert_q4k=args.ninfer_expert_q4k)
     except ValueError as exc:
         parser.error(str(exc))
     if args.dry_run:
         print(json.dumps({"argv": command, "environment": {key: env[key] for key in
-              ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS", "STRATA_SAGE_RMSNORM")}}, indent=2))
+              ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS", "STRATA_SAGE_RMSNORM",
+               "STRATA_SAGE_EXPERT_Q4K")}}, indent=2))
         return 0
     return subprocess.run(command, env=env, check=False).returncode
 
