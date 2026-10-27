@@ -67,6 +67,19 @@ for matched correctness/performance comparisons. A manual self-hosted Windows
 workflow is included for a runner labelled `sm75`; it expects the same developer
 toolchain on PATH and does not publish a release.
 
+For a compiler-only setup without installing a GPU driver, Python 3.12 can fetch
+the pinned CUDA 13.0.2 components (SHA256 checked) with:
+
+```text
+python tools/setup_cuda.py --directory .cuda
+```
+
+The destination must be absent or empty. The hosted CUDA workflow uses this
+setup to compile the selected kernel library and numerical executables on Windows
+and Linux. It does not execute GPU tests or build/qualify the complete Strata
+runtime. Hosted execution currently requires resolving GitHub's account
+payments/spending-limit block reported for commit `4fbf077`.
+
 For a manually prepared source tree, use `-DSAGE_STRATA_SOURCE_DIR=...`. The tree
 must match the source lock and have the integration patch applied.
 

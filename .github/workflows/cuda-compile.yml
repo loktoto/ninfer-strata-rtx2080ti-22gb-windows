@@ -1,0 +1,52 @@
+name: CUDA compiler contracts
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Install build tools
+        run: python -m pip install cmake ninja
+      - name: Install pinned compiler toolkit
+        run: python tools/setup_cuda.py --directory .cuda
+      - name: Configure Linux CUDA compilation
+        if: runner.os == 'Linux'
+        run: >-
+          cmake -S . -B build-cuda -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DSAGE_ENABLE_CUDA=ON -DSAGE_BUILD_STRATA=OFF
+          -DCMAKE_CUDA_ARCHITECTURES=75
+          -DCMAKE_CUDA_COMPILER=${{ github.workspace }}/.cuda/bin/nvcc
+          -DCUDAToolkit_ROOT=${{ github.workspace }}/.cuda
+      - name: Configure Windows CUDA compilation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >-
+          cmake -S . -B build-cuda -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER=cl
+          -DSAGE_ENABLE_CUDA=ON -DSAGE_BUILD_STRATA=OFF
+          -DCMAKE_CUDA_ARCHITECTURES=75
+          "-DCMAKE_CUDA_COMPILER=${{ github.workspace }}/.cuda/bin/nvcc.exe"
+          "-DCUDAToolkit_ROOT=${{ github.workspace }}/.cuda"
+      - name: Compile kernel library and parity executables (no GPU execution)
+        run: >-
+          cmake --build build-cuda --parallel 2 --target
+          sage_sm75_kernels sage_rmsnorm_parity sage_q4k_slots_parity
