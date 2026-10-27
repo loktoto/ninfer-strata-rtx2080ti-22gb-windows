@@ -1,0 +1,17 @@
+{
+  "repository": "InternScience/Sage-A1.5-Q4_K_M-GGUF",
+  "revision": "10b179b52f2c841030db327627e707d076b4c8cf",
+  "file": {
+    "rfilename": "Sage-A1.5-Q4_K_M.gguf",
+    "blobId": "26d8b626c7ddc3d7efc43c6aa372886a6b30260e",
+    "size": 21713463520,
+    "lfs": {
+      "sha256": "a64fe0bbf936db3eb54f66f142c2b2eee569ade83673649f549a21daef8ca395",
+      "size": 21713463520,
+      "pointerSize": 136
+    }
+  },
+  "base_repository": "InternScience/Sage-A1.5",
+  "base_revision": "0e3205cf441cf01df0c0d238cc4738d0e43b4ca7",
+  "hardware_qualified": false
+}

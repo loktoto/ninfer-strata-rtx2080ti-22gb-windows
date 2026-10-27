@@ -1,0 +1,10 @@
+# Included by the pinned PolyStrata patch after its targets have been declared.
+if(NOT TARGET strata-poly OR NOT TARGET sage_sm75_kernels)
+  message(FATAL_ERROR "Sage integration requires strata-poly and sage_sm75_kernels")
+endif()
+if(NOT STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP OR STRATA_HIP_GFX906)
+  message(FATAL_ERROR "Sage integration currently supports the CUDA backend only")
+endif()
+target_link_libraries(strata-poly PRIVATE sage_sm75_kernels)
+target_include_directories(strata-poly PRIVATE "${CMAKE_CURRENT_LIST_DIR}/include")
+target_compile_definitions(strata-poly PRIVATE STRATA_SAGE_INTEGRATION=1)

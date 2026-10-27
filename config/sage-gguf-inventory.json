@@ -1,0 +1,178 @@
+{
+  "provenance": {
+    "model_lock": "config/model.lock.json",
+    "repository": "InternScience/Sage-A1.5-Q4_K_M-GGUF",
+    "revision": "10b179b52f2c841030db327627e707d076b4c8cf",
+    "url": "https://huggingface.co/InternScience/Sage-A1.5-Q4_K_M-GGUF/resolve/10b179b52f2c841030db327627e707d076b4c8cf/Sage-A1.5-Q4_K_M.gguf",
+    "retrieved_at_utc": "2026-10-27T02:15:27.021833+00:00",
+    "http_ranges": [
+      {
+        "request_range": "bytes=0-8388607",
+        "status": 206,
+        "content_range": "bytes 0-8388607/21713463520"
+      },
+      {
+        "request_range": "bytes=8388608-16777215",
+        "status": 206,
+        "content_range": "bytes 8388608-16777215/21713463520",
+        "url_query": "header_part=2"
+      }
+    ],
+    "downloaded_prefix_bytes": 16777216,
+    "downloaded_prefix_sha256": "b5b589b195ca4bd21ebee05a6bf96576fb5a6a01cdbabaf10f64d0bf29ca8415",
+    "full_model_sha256_verified": false,
+    "note": "Only a 16 MiB prefix was downloaded. The prefix hash is not the full-model hash. No inference or tensor payload verification was performed."
+  },
+  "inventory": {
+    "format": "GGUF",
+    "version": 3,
+    "architecture": "qwen35moe",
+    "name": "Agents A1.5",
+    "geometry": {
+      "qwen35moe.block_count": 41,
+      "qwen35moe.context_length": 262144,
+      "qwen35moe.embedding_length": 2048,
+      "qwen35moe.attention.head_count": 16,
+      "qwen35moe.attention.head_count_kv": 2,
+      "qwen35moe.rope.freq_base": 10000000.0,
+      "qwen35moe.attention.layer_norm_rms_epsilon": 9.999999974752427e-07,
+      "qwen35moe.expert_count": 256,
+      "qwen35moe.expert_used_count": 8,
+      "qwen35moe.attention.key_length": 256,
+      "qwen35moe.attention.value_length": 256,
+      "qwen35moe.expert_feed_forward_length": 512,
+      "qwen35moe.expert_shared_feed_forward_length": 512,
+      "qwen35moe.ssm.conv_kernel": 4,
+      "qwen35moe.ssm.state_size": 128,
+      "qwen35moe.ssm.group_count": 16,
+      "qwen35moe.ssm.time_step_rank": 32,
+      "qwen35moe.ssm.inner_size": 4096,
+      "qwen35moe.full_attention_interval": 4,
+      "qwen35moe.rope.dimension_count": 64,
+      "qwen35moe.nextn_predict_layers": 1
+    },
+    "file_type": 15,
+    "file_type_name": "Q4_K_M",
+    "metadata_count": 38,
+    "array_summaries": {
+      "qwen35moe.rope.dimension_sections": {
+        "element_type": "INT32",
+        "count": 4
+      },
+      "tokenizer.ggml.tokens": {
+        "element_type": "STRING",
+        "count": 248320
+      },
+      "tokenizer.ggml.token_type": {
+        "element_type": "INT32",
+        "count": 248320
+      },
+      "tokenizer.ggml.merges": {
+        "element_type": "STRING",
+        "count": 247587
+      }
+    },
+    "tensor_count": 753,
+    "tensor_types": {
+      "F32": 310,
+      "Q4_K": 379,
+      "Q6_K": 64
+    },
+    "representative_tensors": {
+      "F32": [
+        {
+          "name": "output_norm.weight",
+          "dimensions": [
+            2048
+          ],
+          "relative_offset": 417177600,
+          "type_id": 0
+        },
+        {
+          "name": "blk.0.attn_norm.weight",
+          "dimensions": [
+            2048
+          ],
+          "relative_offset": 707969024,
+          "type_id": 0
+        },
+        {
+          "name": "blk.0.ffn_gate_inp.weight",
+          "dimensions": [
+            2048,
+            256
+          ],
+          "relative_offset": 1093795840,
+          "type_id": 0
+        }
+      ],
+      "Q4_K": [
+        {
+          "name": "token_embd.weight",
+          "dimensions": [
+            2048,
+            248320
+          ],
+          "relative_offset": 417185792,
+          "type_id": 12
+        },
+        {
+          "name": "blk.0.attn_gate.weight",
+          "dimensions": [
+            2048,
+            4096
+          ],
+          "relative_offset": 703250432,
+          "type_id": 12
+        },
+        {
+          "name": "blk.0.ffn_gate_exps.weight",
+          "dimensions": [
+            2048,
+            512,
+            256
+          ],
+          "relative_offset": 942800896,
+          "type_id": 12
+        }
+      ],
+      "Q6_K": [
+        {
+          "name": "output.weight",
+          "dimensions": [
+            2048,
+            248320
+          ],
+          "relative_offset": 0,
+          "type_id": 14
+        },
+        {
+          "name": "blk.0.attn_qkv.weight",
+          "dimensions": [
+            2048,
+            8192
+          ],
+          "relative_offset": 707977216,
+          "type_id": 14
+        },
+        {
+          "name": "blk.0.ffn_down_exps.weight",
+          "dimensions": [
+            512,
+            2048,
+            256
+          ],
+          "relative_offset": 721739776,
+          "type_id": 14
+        }
+      ]
+    },
+    "header_bytes": 10991308,
+    "alignment": 32,
+    "tensor_data_offset": 10991328,
+    "model_bytes": 21713463520,
+    "local_bytes": 16777216,
+    "model_size_source": "caller_supplied",
+    "validation": "Header structure and tensor start offsets only; tensor payloads and hashes unverified."
+  }
+}

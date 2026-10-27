@@ -1,75 +1,68 @@
-# NInfer × Strata × Turing Unlock — Windows Architecture Research
+# Execution and acceptance boundaries
 
-**Design stage only.** The engines are separate implementations with different model and kernel paths. This document does not establish that Strata's memory algorithms can directly run inside NInfer.
+Strata remains the sole inference runtime: it reads GGUF, owns dense weights,
+expert slots, CPU workers, KV/recurrent state, streams and graph lifetimes. The
+NInfer-derived library accepts borrowed pointers and a caller stream; it owns no
+model, allocator, tokenizer, server or CUDA context. Its first operation is FP32
+RMSNorm, adapted to preserve Strata's activation representation.
 
-## System boundary: a unified platform is not automatically one fused CUDA runtime
+This operation is useful for establishing the link/stream/numerical boundary. It
+does **not** establish direct expert-slot computation (G2), native Tensor Core
+speedup or complete NInfer integration. The baseline keeps original expert kernels.
 
-```text
-      OpenAI / Anthropic-compatible app or coding agent
-                          |
-             Windows orchestration / router (PROPOSED)
-                + benchmarking + provenance
-                   /                   \
-          Backend A: NInfer       Backend B: Strata
-          RTX 2080Ti/SM75        supported MoE model
-          Qwen3.8-27B path       GPU/RAM/SSD placement
-                   \                   /
-           NVIDIA Windows driver and CUDA
-                          |
-             Modified TU102 / RTX 2080 Ti 22GB
+The independent `sage_scheduler` host library provides slot generation and reader
+lease contracts plus checked KV budget reservations. It is not wired into Strata's
+live CUDA scheduler yet. Completion tokens are supplied by the caller, not GPU
+events created or polled by this library. Its tests validate host state transitions,
+not CUDA race freedom. Future integration must translate actual CUDA event
+completion into these transitions and retain live graph references before eviction.
 
-      OPTIONAL SEPARATE EXPERIMENTAL PLATFORM LANE
-               Windows Turing unlock research
-        (not yet validated, not required by either backend)
-```
+The unlock repository is pinned research input, not a runtime library. It currently
+implements host parsers and simulated lifecycle contracts. No Windows EFI unlocker
+or measured post-driver speed change is available. Nothing here writes firmware,
+changes TDR, changes boot configuration or assumes the GPU is unlocked. Its
+GPL-2.0-only code is not copied or linked into the runtime.
 
-**Do not infer simultaneous co-execution.** Initial architecture should start **one backend at a time** and use distinct API ports when testing multiple servers. Unified API and benchmarks do not imply shared CUDA context, allocator, KV cache, runtime kernels or model format.
+## Sage identity and memory
 
-## Workstream A — NInfer engine
+`config/model.lock.json` pins the official InternScience Q4_K_M GGUF, including the
+publisher's LFS SHA256 and size (21,713,463,520 bytes). The file has not been fully
+downloaded or hash-verified locally. The reference config is separately pinned
+and is checked against the bounded official GGUF header inventory in
+`config/sage-gguf-inventory.json`. Only a 16 MiB prefix was downloaded; the complete
+weight payload and its checksum remain unverified.
 
-Source: [NInfer upstream](https://github.com/Neroued/ninfer) and [local SM75 Windows derivative](https://github.com/loktoto/ninfer-2080ti-22g-windows).
+Reference geometry: Qwen3.5 MoE, 40 layers, width 2048, 256 routed experts, top-8,
+expert width 512, 10 full-attention layers, 2 KV heads, head width 256. The reference
+maximum position count is 262144; this is not an observed working context limit.
+The GGUF declares 41 blocks and one next-token prediction layer, consistent with
+40 main layers plus the draft layer. Its 753 tensors comprise 379 Q4_K, 64 Q6_K
+and 310 F32 tensors. This inventory is why the integration retains mixed tensor
+types and leaves draft execution disabled for baseline qualification.
 
-- Identify exact supported model container/version, quantization, ops, model architecture and kernel capabilities of the **local fork** (do not assume current upstream RTX 5090 requirements apply unchanged to the fork).
-- Test Windows builds on an actual modified 22 GB / SM75 card. Do not equate hosted CI success with working GPU inference.
-- Keep the NInfer baseline independent of Strata until explicit boundaries are proven.
+For these full-attention dimensions, uncompressed FP16 KV alone is 20,480 bytes
+per token: 0.625 / 1.25 / 2.5 / 5 GiB at 32K / 64K / 128K / 256K. These estimates
+exclude recurrent state, alignment, scratch, dense weights, expert staging,
+graphs, driver/display use and any draft state. They explain why dynamic expert
+residency matters even when a roughly 20.2 GiB GGUF resembles a 22GB VRAM budget.
 
-## Workstream B — Strata engine and techniques
+## Next integration gates
 
-Source: [Strata](https://github.com/kossum/strata).
+1. Build patched `strata-poly` on Windows SM75; inspect actual GGUF and pass short
+   prompt/logit checks before a real 32768-token prompt plus output allowance.
+2. Compare original versus NInfer-derived RMSNorm with independent operator oracle
+   and teacher-forced model logits. Only enable after target evidence; measure
+   complete inference latency before claiming an improvement.
+3. Adapt GGUF Q4_K expert operations. NInfer's signed groupwise Q4 representation
+   differs from Q4_K's 256-element block scales/minima and mixed tensor recipe.
+   Never reinterpret the bytes or silently requantize. Any unpacking workspace
+   must be bounded, owned and budgeted by Strata.
+4. Integrate event-backed slot leases and KV reservations; test delayed CPU work,
+   copies, eviction, graph pointer updates and allocation failure on the real GPU.
+5. Qualify each context size for full prompt consumption, retrieval and document
+   quality. Enable MTP only after inspecting GGUF draft tensors and baseline parity.
+6. Implement/validate the Windows boot unlock separately; run matched MMA and
+   whole-model A/B tests after driver takeover before using unlock in tuning.
 
-- Strata is a **full local inference product**; memory tiering, CPU/GPU expert placement and SSD usage are internally coupled to its runtime and models.
-- Start with independently supported Windows + CUDA build/model testing; document any compatibility restrictions for modified Turing hardware.
-- Only then study **one of two** integration options: (1) route clients to Strata as its own engine; (2) port a narrowly defined, license-compatible **idea** or explicitly portable subsystem to a compatible NInfer model/ops path.
-- MoE *expert* placement does not directly solve dense model weight capacity or KV-cache growth. Map each memory object and bottleneck explicitly; do not claim universal context extension.
-
-## Workstream C — optional Turing GPU unlock
-
-Sources: [Linux Turing-unlock](https://github.com/nlzy/turing-unlock) and [Windows port research](https://github.com/loktoto/Turing-unlock-windows).
-
-- Linux upstream describes a TU102 FP16 Tensor Core throughput unlock on particular tested hardware and driver configurations. This is **not** equivalent to enabling extra CUDA cores, VRAM or doubling all operations.
-- Our Windows project currently offers a portable host-validation toolkit; **no qualified Windows firmware/UEFI GPU unlock** has been demonstrated in that repository.
-- Gate hardware changes behind recovery procedures and independent testing. Test only relevant FP16 input / FP32 accumulate GEMM paths plus correctness and device health.
-- Never require the unlock to run the normal Windows platform/backend baseline.
-
-## Possible integration levels
-
-| Level | What is shared | Main unknown | Initial priority |
-|---|---|---|---|
-| L0 — Coordinated serving | Common launcher, API selection, test and telemetry format; independent runtimes | Driver, ports, installation and model footprints | High |
-| L1 — Unified capacity experiments | Comparable model- and memory-specific policies between runtime experiments | Different model architectures; PCIe, RAM, SSD latency | Medium |
-| L2 — Code-level memory integration | Explicit NInfer runtime API / allocator / model support, if engineered | Ownership, CUDA streams, tensor formats, paging and numerical parity | Experimental |
-| L3 — Unlock-assisted serving | Pre-qualified platform unlock used below either backend | Windows pre-boot/driver transition and real kernel uplift | Blocked |
-| L4 — Fully integrated kernels | Single runtime supporting desired model/placement/unlock combination | Large engineering scope; no established interface | Research only |
-
-## Experimental methodology
-
-- A/B **within the same engine and same model** for offload controls. Do not compare a 27B dense model to a ~125B MoE model and call the difference a Strata kernel gain.
-- Hardware unlock A/B must use the same engine, model, quantization, clock/power envelope and GEMM kernel path, as closely as possible.
-- Report baseline and experimental VRAM, host RAM, SSD reads, PCIe traffic, time-to-first-token, prefill, decode, p50/p95 latency, output quality and error rates.
-- Note conditions where larger working set is possible but per-token decode speed decreases.
-
-## Upstream and licensing
-
-NInfer (Apache-2.0), Strata (MIT) and turing-unlock (GPL-2.0-only) are independent projects. The unified launcher concept alone does not grant permission to redistribute other projects' binaries or proprietary firmware. Assess distribution and source obligations before packaging.
-
-See [Roadmap](ROADMAP.md) and [Project README](../README.md).
+All hardware gates currently remain not run. Hosted Windows compilation and host
+unit tests cannot promote those gates.

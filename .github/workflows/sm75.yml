@@ -1,0 +1,20 @@
+name: Windows SM75 build and kernel parity
+on:
+  workflow_dispatch:
+jobs:
+  sm75:
+    runs-on: [self-hosted, Windows, X64, sm75]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the unified Strata runtime
+        shell: powershell
+        run: .\tools\build_windows.ps1
+      - name: Build numerical and host tests
+        run: cmake --build build-windows --target sage_rmsnorm_parity slot_pool_test --parallel 2
+      - name: Run independent kernel oracle
+        run: .\build-windows\kernels\sage_rmsnorm_parity.exe
+      - name: Run host scheduler contracts
+        run: .\build-windows\slot_pool_test.exe
+      - name: Run Python contracts
+        run: python -m unittest discover -s tests -p "test_*.py" -v

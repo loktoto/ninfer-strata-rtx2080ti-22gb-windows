@@ -1,0 +1,62 @@
+--- a/src/poly/kernels.cu
++++ b/src/poly/kernels.cu
+@@ -1,6 +1,9 @@
+ // src/poly/kernels.cu - see the header.  The reference for every formula is llama.cpp's graph of the model and the
+ // ggml ops it builds.  Where a kernel takes several tokens, blockIdx.y is the token unless it says otherwise.
+ #include "strata/poly/kernels.hpp"
++#ifdef STRATA_SAGE_INTEGRATION
++#include "sage/cuda/rms_norm.hpp"
++#endif
+ #ifdef STRATA_POLY_GDN_MMA
+ #include "gdn_mma.hpp"
+ #include "strata/kernels/gdn_mma_policy.hpp"
+@@ -2512,6 +2515,14 @@
+ }
+ 
+ void rms_norm(const float* x, const float* w, float* y, int n, int rows, float eps, void* stream, int y_stride) {
++#ifdef STRATA_SAGE_INTEGRATION
++    // Explicitly enabled experiment; preserve the original path by default. The
++    // first candidate covers Sage's 2048-wide main norms, using caller memory.
++    const char* backend = std::getenv("STRATA_SAGE_RMSNORM");
++    if (backend && std::string(backend) == "1" && n == 2048 && x != y && w != y &&
++        sage::cuda::try_rms_norm_f32(x, w, y, n, rows, eps, stream, y_stride ? y_stride : n))
++        return;
++#endif
+     rms_norm_kernel<<<rows, sum_threads(n), 0, cs(stream)>>>(x, w, y, n, eps, y_stride ? y_stride : n);
+     if (const cudaError_t e = cudaGetLastError(); e != cudaSuccess)
+         throw std::runtime_error(std::string("rms_norm: ") + cudaGetErrorString(e));
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -1,6 +1,9 @@
+ // src/poly/engine.cpp - see the header.  What every architecture shares: the files, the weights' way to VRAM, the
+ // routed experts (the cache, the CPU, a prompt batch), the sequence's state, and the calls that feed tokens.
+ #include "engine.hpp"
++#ifdef STRATA_SAGE_INTEGRATION
++#include "sage/strata_policy.hpp"
++#endif
+ 
+ #include "deepseek4.hpp"
+ #include "gemma4.hpp"
+@@ -1045,6 +1048,10 @@
+ 
+ // The engine for a model file: its general.architecture says which.
+ std::unique_ptr<Engine> Engine::open(const Options& o) {
++#ifdef STRATA_SAGE_INTEGRATION
++    // Covers direct Engine callers as well as CLI/environment-derived options.
++    sage::strata::require_complete_routing(o.tail_skip, o.skip_weight);
++#endif
+     const Shards file(o.model);
+     const MetaValue* arch = file.get("general.architecture");
+     const std::string name = arch ? arch->s : std::string();
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2226,3 +2226,9 @@
+   add_executable(gfx906_qsa_query_swizzle_probe bench/gfx906_qsa_query_swizzle_probe.cpp)
+   target_link_libraries(gfx906_qsa_query_swizzle_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target})
+ endif()
++
++# External single-owner Sage integration; an empty path leaves upstream unchanged.
++set(STRATA_SAGE_INTEGRATION_DIR "" CACHE PATH "Optional Sage integration module")
++if(STRATA_SAGE_INTEGRATION_DIR)
++  include("${STRATA_SAGE_INTEGRATION_DIR}/CMakeLists.txt")
++endif()
