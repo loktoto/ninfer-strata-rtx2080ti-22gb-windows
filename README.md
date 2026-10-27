@@ -62,6 +62,9 @@ cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity -
 ```
 
 Then follow the [strict launch instructions](integration/strata/README.md).
+For the local OpenAI-compatible API, follow [native API startup](docs/API.md).
+For full prompt/continuation diagnostic capture, use the
+[Windows model-validation procedure](docs/MODEL_VALIDATION.md).
 Keep the original kernel selected for the baseline; opt into the candidate only
 for matched correctness/performance comparisons. A manual self-hosted Windows
 workflow is included for a runner labelled `sm75`; it expects the same developer
