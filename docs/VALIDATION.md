@@ -5,8 +5,8 @@ This is an initial source implementation, not a passed P1 or release milestone.
 | Check | Observed result |
 | --- | --- |
 | Linux GCC 14.2 / CMake 4.4.4 Release host build | Passed |
-| CTest slot-pool and strict routing policy suites | 4/4 passed |
-| Python GGUF inspector and strict launch contracts | 19/19 passed |
+| Host CTest suites including 256K token-file parsing | 5/5 passed |
+| Python inspector, launch, API and validation contracts | 51/51 passed |
 | Slot policy strict compiler warnings | Passed |
 | Slot policy ASan + UBSan | Passed |
 | Patch against locked PolyStrata commit | Applied successfully |
@@ -41,6 +41,15 @@ The pinned CUDA 13.0.2 redistributable installer was exercised on Linux. Both
 kernel objects and both parity executables compile/link for SM75 with nvcc
 13.0.88 and GCC 14.2. Running the Q4_K GPU oracle here fails explicitly because
 the CUDA driver/runtime is unavailable; no GPU numerical pass is recorded.
+
+The pinned upstream tokenizer extractor also successfully read the verified
+16 MiB Sage header prefix. It exported vocabulary 248320, merges 247587 and
+the 9025-byte GGUF chat template (SHA256
+`0080393e13df7322bed792a78e75daf8a0374a80928996e5cf3cfd2ab4c1e1be`).
+Five encode/decode round trips passed for English, Cantonese, emoji, combining
+marks, source code and whitespace using regex 2026.9.29. This is extraction and
+round-trip evidence, not tokenizer parity with an independent reference or a
+test of the model's reasoning quality.
 
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do
