@@ -13,6 +13,8 @@ This is an initial source implementation, not a passed P1 or release milestone.
 | Repeated bootstrap | Recognized existing patch; no second application |
 | Official Sage GGUF metadata | Parsed bounded 16 MiB prefix; provenance recorded |
 | Selected SM75 CUDA kernels and both GPU oracle executables | Compile/link passed, NVIDIA CUDA 13.0.88, GNU 14.2 |
+| Complete patched strata-poly runtime, Linux development build | All 127 build/link steps passed at 9307e76; both candidate symbols linked |
+| Runtime help and missing token-file error | Passed with official driver stub for loader only; no inference |
 | Windows MSVC / CUDA compile | Not run |
 | RMSNorm numerical GPU oracle | Implemented, not run |
 | Sage logits, 32K inference, API, performance | Not run |
@@ -50,6 +52,9 @@ Five encode/decode round trips passed for English, Cantonese, emoji, combining
 marks, source code and whitespace using regex 2026.9.29. This is extraction and
 round-trip evidence, not tokenizer parity with an independent reference or a
 test of the model's reasoning quality.
+
+See FULL_RUNTIME_BUILD.md for the complete runtime build command, artifact
+fingerprint and exact scope of the driver-stub CLI checks.
 
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do

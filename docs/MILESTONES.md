@@ -6,8 +6,14 @@ Source milestones are distinct from hardware acceptance gates in ROADMAP.md.
 | --- | --- | --- |
 | `0a631e0` | Pinned Sage/Strata baseline, linked RMSNorm candidate, host slot policies, inventory/launch/build tools | Local 2 C++ suites / 16 Python tests; hosted Windows C++ and Linux passed; Windows path expectation subsequently corrected |
 | `4fbf077` | Direct cached Q4_K expert-slot kernel and dispatcher hook; unchanged mixed-format fallback | Local 4 C++ suites / 19 Python tests; selected CUDA SM75 objects and both oracle executables compile/link |
+| `90c5235` | Pinned Windows/Linux CUDA compiler setup and hosted compile workflow | Linux installer exercised; Windows archive layout inspected; hosted CI blocked by account billing |
+| `aaeab2e` | Exact token-file input for long Windows prompts and continuations | Host parser tests include 262144 IDs; all three patches apply and reapply safely |
+| `9307e76` | Strict local API launcher and baseline/candidate diagnostic runner | 51 Python tests; actual GGUF header tokenizer extraction and five round trips; Windows inference pending |
 
-Compiler automation is a subsequent source milestone: pinned cross-platform
-CUDA components and a hosted compiler-only workflow. GPU execution remains
-required to pass G2. Live event-backed scheduler integration and Windows boot
+The complete runtime at `9307e76` subsequently passed all 127 Linux SM75
+compile/link steps and non-inference CLI smoke checks. See FULL_RUNTIME_BUILD.md
+for the artifact and toolchain evidence. The Windows GPU workflow for that commit
+was dispatched and remains queued at the last observation.
+
+GPU execution remains required to pass G2. Live event-backed scheduler integration and Windows boot
 unlock remain unfinished; no source milestone promotes those gates.

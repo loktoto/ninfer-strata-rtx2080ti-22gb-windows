@@ -122,3 +122,5 @@ remain evidence-dependent workstreams, not launch-time assumptions.
 
 Source attribution and license boundaries are documented in [NOTICE](NOTICE).
 The local checks and unverified gates are recorded in [validation](docs/VALIDATION.md).
+The [complete Linux development build](docs/FULL_RUNTIME_BUILD.md) also passed
+for the patched SM75 runtime, including both linked candidate operations.
