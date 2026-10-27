@@ -1,7 +1,7 @@
 # NInfer-derived SM75 kernels
 
 `sage_sm75_kernels` is a small CUDA static library linked into the unified
-runtime. It currently provides FP32 RMSNorm. Strata owns every allocation and
+runtime. It provides FP32 RMSNorm and an original correctness-first GGUF Q4_K slot GEMV. Strata owns every allocation and
 the execution stream. This kernel performs no allocation, copies, or stream
 synchronization, and preserves Strata's FP32 activation/weight/output storage.
 It is a SIMT reduction, not a Tensor Core matrix multiplication.
@@ -65,3 +65,18 @@ The output criterion is `abs(error) <= 3e-5 + 3e-5*abs(oracle)` per element.
 GPU compilation and execution remain pending until a CUDA toolkit and physical
 SM75 GPU are available; the implementation must not be called hardware-qualified
 based on host checks.
+
+## Direct Q4_K slots
+
+`try_q4k_slots_q8_1` accepts up to eight borrowed Q4_K matrix / Q8_1 input /
+F32 output pointer triples and the caller stream. It performs no allocation,
+transfer or weight repacking. It implements the GGUF six-bit scale/minimum
+encoding and the Q8_1 integer dot operation, not NInfer signed-Q4 packing. This
+is original kernel code using the same borrowed-pointer boundary as the
+NInfer-derived operations; it is not presented as a port of NInfer's Q4 kernel.
+
+`--ninfer-expert-q4k` in the strict launcher enables the candidate only for the
+cached host-routed expert path; Q6_K and MmvqIds retain native dispatch. It is a
+SIMT correctness candidate with no speedup claim. Run `sage_q4k_slots_parity`
+on SM75 for independent long-double numerical checks and CUDA graph coverage.
+The CPU fixture test alone does not validate device arithmetic.

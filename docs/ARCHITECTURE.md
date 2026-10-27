@@ -6,9 +6,10 @@ NInfer-derived library accepts borrowed pointers and a caller stream; it owns no
 model, allocator, tokenizer, server or CUDA context. Its first operation is FP32
 RMSNorm, adapted to preserve Strata's activation representation.
 
-This operation is useful for establishing the link/stream/numerical boundary. It
-does **not** establish direct expert-slot computation (G2), native Tensor Core
-speedup or complete NInfer integration. The baseline keeps original expert kernels.
+This operation is useful for establishing the link/stream/numerical boundary. The Q4_K candidate also reads cached expert-slot pointers directly at the gate/up
+and down projections. Q6_K, device-routed all-cached ID dispatch and unsupported
+calls retain original kernels. Both candidates remain opt-in. GPU parity and
+whole-model validation are required for G2; no Tensor Core speedup is claimed.
 
 The independent `sage_scheduler` host library provides slot generation and reader
 lease contracts plus checked KV budget reservations. It is not wired into Strata's
@@ -53,7 +54,7 @@ residency matters even when a roughly 20.2 GiB GGUF resembles a 22GB VRAM budget
 2. Compare original versus NInfer-derived RMSNorm with independent operator oracle
    and teacher-forced model logits. Only enable after target evidence; measure
    complete inference latency before claiming an improvement.
-3. Adapt GGUF Q4_K expert operations. NInfer's signed groupwise Q4 representation
+3. Qualify and optimize the implemented GGUF Q4_K slot operations. NInfer's signed groupwise Q4 representation
    differs from Q4_K's 256-element block scales/minima and mixed tensor recipe.
    Never reinterpret the bytes or silently requantize. Any unpacking workspace
    must be bounded, owned and budgeted by Strata.

@@ -5,14 +5,14 @@ This is an initial source implementation, not a passed P1 or release milestone.
 | Check | Observed result |
 | --- | --- |
 | Linux GCC 14.2 / CMake 4.4.4 Release host build | Passed |
-| CTest slot-pool and strict routing policy suites | 2/2 passed |
-| Python GGUF inspector and strict launch contracts | 16/16 passed |
+| CTest slot-pool and strict routing policy suites | 4/4 passed |
+| Python GGUF inspector and strict launch contracts | 19/19 passed |
 | Slot policy strict compiler warnings | Passed |
 | Slot policy ASan + UBSan | Passed |
 | Patch against locked PolyStrata commit | Applied successfully |
 | Repeated bootstrap | Recognized existing patch; no second application |
 | Official Sage GGUF metadata | Parsed bounded 16 MiB prefix; provenance recorded |
-| CUDA configuration in current workspace | Blocked: `Failed to find nvcc` |
+| Selected SM75 CUDA kernels and both GPU oracle executables | Compile/link passed, NVIDIA CUDA 13.0.88, GNU 14.2 |
 | Windows MSVC / CUDA compile | Not run |
 | RMSNorm numerical GPU oracle | Implemented, not run |
 | Sage logits, 32K inference, API, performance | Not run |
@@ -21,12 +21,16 @@ This is an initial source implementation, not a passed P1 or release milestone.
 
 Host tests validate policy behavior, not actual GPU completion or race freedom.
 The scheduler policy library is not connected to Strata's live event/eviction path.
-The RMSNorm patch links a candidate operation; it does not implement direct expert
-slot kernels. New kernels remain opt-in, and baseline skips remain forbidden.
+The second patch adds direct cached Q4_K slot kernels at gate/up and down
+projections; GPU numerical execution remains untested. New kernels remain opt-in, and baseline skips remain forbidden.
 
 The official GGUF payload was not downloaded in full. The model lock's SHA256
 comes from the publisher's LFS metadata; only the downloaded header-prefix hash
 was verified here. Header agreement does not establish numerical compatibility.
+
+First pushed host CI passed Windows C++ build/tests and Linux checks; one Windows
+Python expectation compared a short temporary path to its resolved long form.
+The expectation now uses canonical paths, matching the existing launcher behavior.
 
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do

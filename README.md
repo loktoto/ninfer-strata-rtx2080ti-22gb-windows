@@ -4,8 +4,7 @@ One Strata-owned runtime for Sage-A1.5 Q4_K_M on Windows 11 x64 and the
 RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
 **Development implementation; hardware acceptance is pending.** This repository
-does not yet provide a qualified Windows executable, an expert-kernel integration,
-or a Windows GPU unlock. No throughput or 256K-context success is claimed.
+does not yet provide a qualified Windows executable or a verified Windows GPU unlock. No throughput or 256K-context success is claimed.
 
 ## What is implemented
 
@@ -14,6 +13,8 @@ or a Windows GPU unlock. No throughput or 256K-context success is claimed.
   plus independent numerical GPU parity tests. Default execution keeps Strata's
   original kernel until target validation permits selecting the new path.
 - A strict baseline launcher that disables expert skipping and speculative decode.
+- An opt-in Q4_K expert-slot GEMV path using Strata-owned Q8_1 scratch and its
+  existing stream, with independent GPU oracle tests; numerical qualification pending.
 - Host slot-generation/reader-lease and KV-budget contracts, tested independently;
   these are not yet connected to Strata's CUDA events or live eviction logic.
 - An official Sage model lock and bounded GGUF tensor inventory tool.
@@ -55,8 +56,9 @@ The build links one inference engine; it does not launch a second NInfer engine.
 Build and run the separate numerical kernel check on the SM75 machine:
 
 ```powershell
-cmake --build build-windows --target sage_rmsnorm_parity --parallel 2
+cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity --parallel 2
 .\build-windows\kernels\sage_rmsnorm_parity.exe
+.\build-windows\kernels\sage_q4k_slots_parity.exe
 ```
 
 Then follow the [strict launch instructions](integration/strata/README.md).
