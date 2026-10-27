@@ -1,0 +1,16 @@
+Sage Windows Unified Engine
+
+Original integration and host scheduling code is distributed under Apache-2.0.
+
+The selected RMSNorm kernel derives from NInfer by Neroued and the loktoto
+SM75 fork, under Apache-2.0. See kernels/ for exact source attribution and changes.
+
+PolyStrata/Strata and its dependencies retain their own licenses in the pinned
+source checkout. Build/package distributors must include those license files.
+The integration patches do not replace the licenses of patched upstream files.
+
+The separately pinned Turing-unlock-windows project is GPL-2.0-only research
+input. Its source is not included in or linked into this inference runtime.
+
+Sage-A1.5 model weights are separate artifacts. Their publisher's model license
+and notices apply; no model weights are redistributed in this repository.

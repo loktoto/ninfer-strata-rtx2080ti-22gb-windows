@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "strata": {
+    "url": "https://github.com/VecSzn/PolyStrata.git",
+    "commit": "52c31cfcb55d7e42506a57757886af73f9547314",
+    "ggml_commit": "3cf03257f219afbe7334045ff7c6a06ac68c627d"
+  },
+  "ninfer_kernel_origin": {
+    "url": "https://github.com/loktoto/ninfer-2080ti-22g-windows.git",
+    "commit": "de849e1f131a8c615ae2943d2922d217c488fb0e"
+  },
+  "unlock_research": {
+    "url": "https://github.com/loktoto/Turing-unlock-windows.git",
+    "commit": "f4ecb58dcf0d57673fc86d6ac6a88e69db57d922",
+    "linked_into_runtime": false,
+    "hardware_unlock_verified": false
+  }
+}

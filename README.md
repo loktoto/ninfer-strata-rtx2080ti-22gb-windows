@@ -1,60 +1,106 @@
-# NInfer × Strata × Turing GPU Unlock — RTX 2080 Ti 22GB on Windows
+# Sage-A1.5 Windows Unified Engine
 
-**Experimental Windows local LLM inference research: combine the NInfer CUDA SM75 performance path, Strata's large-model MoE execution and GPU/RAM/SSD expert-tiering design, and independent Turing (TU102) FP16 Tensor Core unlock experiments on a modified NVIDIA RTX 2080 Ti 22GB.**
+One Strata-owned runtime for Sage-A1.5 Q4_K_M on Windows 11 x64 and the
+RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
-> **Project status: integration research only.** No three-way integrated inference kernel, Windows GPU unlock, performance gain, installable release or extended-context guarantee has been validated in this repository.
+**Development implementation; hardware acceptance is pending.** This repository
+does not yet provide a qualified Windows executable, an expert-kernel integration,
+or a Windows GPU unlock. No throughput or 256K-context success is claimed.
 
-**Proposed GitHub repository name:** `ninfer-strata-gpu-unlock-rtx2080ti-22gb-windows`. **Correct spelling:** `NInfer` (capital letter **I**) / `ninfer` (lowercase); `Nlnfer` with a lowercase **l** is a typo. The repository has **not** been renamed yet.
+## What is implemented
 
-繁體中文：研究點樣喺 **Windows + 改裝 RTX 2080 Ti 22GB**，發揮 **NInfer CUDA 推理、Strata 的 MoE／GPU-RAM-SSD 分層技術，以及 Turing FP16 Tensor Core Unlock**。唔係聲稱三套系統已合併成功；以兼容性、實卡驗證、推理準確性同效能 A/B 測試作為必要門檻。
+- Pinned PolyStrata integration patch and reproducible source preparation.
+- An opt-in NInfer-derived FP32 RMSNorm kernel using Strata-owned buffers/stream,
+  plus independent numerical GPU parity tests. Default execution keeps Strata's
+  original kernel until target validation permits selecting the new path.
+- A strict baseline launcher that disables expert skipping and speculative decode.
+- Host slot-generation/reader-lease and KV-budget contracts, tested independently;
+  these are not yet connected to Strata's CUDA events or live eviction logic.
+- An official Sage model lock and bounded GGUF tensor inventory tool.
+- Windows hardware inventory capture and host test CI for Windows/Linux.
 
-## The three technologies (and their distinct boundaries)
+The unlock repository is tracked as research only. Its current host parser tests
+are not hardware unlock evidence. See [architecture and gates](docs/ARCHITECTURE.md).
 
-| Technology | Real role | Status relevant to this project |
-| --- | --- | --- |
-| **[NInfer](https://github.com/Neroued/ninfer)** / [SM75 Windows fork](https://github.com/loktoto/ninfer-2080ti-22g-windows) | A standalone C++/CUDA inference engine; our fork investigates Qwen3.8-27B inference on modified RTX 2080 Ti 22GB / SM75 under Windows | The Windows fork is a development project, **not yet a physically qualified Windows release** |
-| **[Strata](https://github.com/kossum/strata)** | A separate end-to-end local inference engine, with its own model execution, MoE expert placement / GPU-RAM-SSD memory strategy, and Windows support for specified hardware | **Not** a drop-in NInfer memory plugin; compatibility and integration must be proven |
-| **[Turing Unlock for Windows](https://github.com/loktoto/Turing-unlock-windows)** / [Linux upstream](https://github.com/nlzy/turing-unlock) | Independent TU102 feature-unlock research aimed at FP16 Tensor Core throughput; it operates below inference kernels, in the platform/driver boot path | Linux upstream reports device-specific tests; our Windows port has **host-level tests only**, no qualified Windows unlock |
+## Host development checks
 
-**Important model distinction:** NInfer's targeted **Qwen3.8-27B** path and Strata's **Qwen3.8-Flash-Next MoE** path are not identical workloads. They must not be benchmarked against each other as if both were the same model or as if Strata's scheduler could simply be plugged into NInfer.
+Requires Python 3.10+, CMake 3.28+, and a C++20 compiler. These tests need no GPU
+or model download. Linux is used for development checks, not as the product target.
 
-## What "integration" could mean
+```text
+python -m pip install cmake ninja
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+python -m unittest discover -s tests -p "test_*.py" -v
+```
 
-1. **Platform-first (lowest-risk):** a Windows launcher / serving layer selects NInfer or Strata as distinct backends, sharing configuration, benchmarking, model provenance and monitoring. They need not run the same kernel.
-2. **Selective technology integration (research):** identify whether specific memory-tiering / expert placement ideas can be adapted to a *compatible* NInfer runtime and model architecture. Measure real PCIe/host RAM costs, cache behavior, synchronization and correctness. This may be infeasible for some model families.
-3. **GPU unlock A/B (independent and optional):** only after a separately qualified Windows TU102 procedure exists, compare **the same model, kernels and settings** with and without the unlock on an actual device. Do not promise blanket GPU or LLM speedups.
-4. **Combined experiments (last):** try any mutually compatible combinations after all isolated gates pass, report negative outcomes and preserve a no-unlock fallback.
+## Build the Windows inference runtime
 
-This project targets **22 GB VRAM**, not a reduced-VRAM configuration. Host RAM/SSD is a potential capacity tier for larger models, inactive MoE experts or context state, **not automatically a speed improvement**.
+Use an x64 Visual Studio developer PowerShell with CUDA's compiler on PATH.
+The CUDA/MSVC combination still requires target-machine qualification. The build
+script installs no drivers and changes no boot or watchdog settings.
 
-## What this repository contains
+```powershell
+python -m pip install cmake ninja
+.\tools\build_windows.ps1
+```
 
-- [Architecture and compatibility boundaries](docs/ARCHITECTURE.md)
-- [Roadmap, evidence gates and benchmarks](docs/ROADMAP.md)
-- References to the two separate, upstream-derived development repos
+This fetches the pinned Strata source into `.deps/PolyStrata`, applies the local
+patch, configures `SAGE_ENABLE_CUDA=ON`, `SAGE_BUILD_STRATA=ON`, and architecture
+`75`, then builds `strata-poly`. Strata fetches its own pinned ggml dependency.
+The executable is normally `build-windows/strata/strata-poly.exe` with Ninja.
+The build links one inference engine; it does not launch a second NInfer engine.
 
-**No integrated source tree, kernel patch, Windows installer, reliable benchmark, or real-device GPU unlock is currently published here.**
+Build and run the separate numerical kernel check on the SM75 machine:
 
-## What must be demonstrated before making performance claims
+```powershell
+cmake --build build-windows --target sage_rmsnorm_parity --parallel 2
+.\build-windows\kernels\sage_rmsnorm_parity.exe
+```
 
-- Actual modified TU102 / RTX 2080 Ti 22GB board, detected VRAM, Windows build, driver and CUDA compute capability.
-- Separate runnable NInfer and Strata baselines on supported model/driver combinations, with checksums and exact build revisions.
-- Strict model/quantization/input parity for all within-engine A/B tests; independent correctness and 8K/32K/64K semantic-retrieval tests where supported.
-- PCIe copy bytes/time, GPU residency, RAM/SSD I/O, TTFT, prefill tokens/s, decode tokens/s and stability.
-- GPU-unlock and no-unlock results on the **same** model and compute paths, independently of RAM offload; measurements must identify FP16/FP32 accumulate kernel use.
-- Public failure results, recovery gates, license/attribution compliance and rollback steps.
+Then follow the [strict launch instructions](integration/strata/README.md).
+Keep the original kernel selected for the baseline; opt into the candidate only
+for matched correctness/performance comparisons. A manual self-hosted Windows
+workflow is included for a runner labelled `sm75`; it expects the same developer
+toolchain on PATH and does not publish a release.
 
-## Accuracy, safety and licensing
+For a manually prepared source tree, use `-DSAGE_STRATA_SOURCE_DIR=...`. The tree
+must match the source lock and have the integration patch applied.
 
-- An upstream Linux TU102 unlock is **not proof of Windows unlock support**. GPU feature unlock experiments may involve hardware/power risk; never infer a general-purpose performance improvement.
-- No confidential firmware dumps, private keys or licensed model artifacts are hosted here.
-- NInfer upstream: **Apache-2.0**; Strata upstream: **MIT**; Turing-unlock upstream: **GPL-2.0-only** according to their respective source repositories. A future distribution must assess each component's license and provenance independently.
-- All proposed optimizations are **hypotheses until independently replicated on physical hardware**.
+## Model identity
 
-Maintained by [loktoto](https://github.com/loktoto). Contributions should label each claim **planned / source-built / host-tested / real-hardware-tested**.
+The official artifact is
+[InternScience/Sage-A1.5-Q4_K_M-GGUF](https://huggingface.co/InternScience/Sage-A1.5-Q4_K_M-GGUF/tree/10b179b52f2c841030db327627e707d076b4c8cf).
+Use the revision and expected SHA256 in [model.lock.json](config/model.lock.json).
+The 21.7 GB model is not bundled or automatically downloaded by setup.
+The [inspected official header](config/sage-gguf-inventory.json) confirms
+`qwen35moe` with mixed Q4_K/Q6_K/F32 tensors. It is a header inventory, not a
+completed model correctness test.
 
-## Discoverability
+Inspect a local file without loading its tensors:
 
-Suggested GitHub Topics: `ninfer`, `strata`, `turing-unlock`, `gpu-unlock`, `rtx-2080-ti`, `windows`, `cuda`, `sm75`, `llm-inference`, `local-llm`, `moe`, `gpu-offloading`.
+```powershell
+python tools/inspect_gguf.py D:\models\Sage-A1.5-Q4_K_M.gguf
+```
 
-Repository Description (manual GitHub About field): *Windows RTX 2080 Ti 22GB research integrating NInfer CUDA SM75, Strata MoE GPU/RAM/SSD offloading and experimental Turing FP16 Tensor Core unlock. Not yet integrated.*
+Inventory is not a checksum verification or a numerical inference test. Capture
+full file hashes, binary hash, GPU/driver and compiler information separately:
+
+```powershell
+python tools/capture_baseline.py --model D:\models\Sage-A1.5-Q4_K_M.gguf --engine build-windows\strata\strata-poly.exe --source-lock config\sources.lock.json --output evidence\p0-001.json
+```
+
+That collector only runs on native Windows and never marks an inference gate as
+passed. It hashes full files, so allow time for the model read.
+
+## Project scope
+
+Retain original routing and all selected experts; retain the GGUF's mixed tensor
+formats. “No expert skipping” does not mean Q4 quantization is lossless. Adapt
+NInfer operations at borrowed-buffer boundaries, not through its separately owning
+Engine or incompatible packed Q4 loader. GPU unlock and long-context performance
+remain evidence-dependent workstreams, not launch-time assumptions.
+
+Source attribution and license boundaries are documented in [NOTICE](NOTICE).
+The local checks and unverified gates are recorded in [validation](docs/VALIDATION.md).

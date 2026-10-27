@@ -1,0 +1,6 @@
+/build*/
+/.deps/
+/evidence/
+/models/
+__pycache__/
+*.pyc
