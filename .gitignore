@@ -1,5 +1,6 @@
 /build*/
 /.deps/
+/.cuda/
 /evidence/
 /models/
 __pycache__/

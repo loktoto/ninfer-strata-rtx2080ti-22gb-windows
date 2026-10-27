@@ -32,6 +32,16 @@ First pushed host CI passed Windows C++ build/tests and Linux checks; one Window
 Python expectation compared a short temporary path to its resolved long form.
 The expectation now uses canonical paths, matching the existing launcher behavior.
 
+Commit `4fbf077` contains the direct-slot milestone. Its GitHub jobs could not
+start: the check annotation reports account payments/spending-limit restrictions.
+This is a CI availability block, not a compiler/test result. The new compiler-only
+workflow remains unexecuted on hosted Windows until that account issue is resolved.
+
+The pinned CUDA 13.0.2 redistributable installer was exercised on Linux. Both
+kernel objects and both parity executables compile/link for SM75 with nvcc
+13.0.88 and GCC 14.2. Running the Q4_K GPU oracle here fails explicitly because
+the CUDA driver/runtime is unavailable; no GPU numerical pass is recorded.
+
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do
 not interpret compilation or successful model loading as passing that sequence.
