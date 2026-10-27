@@ -24,6 +24,11 @@ python integration/strata/launch_strict.py --engine build-windows/strata/strata-
 ```
 
 Token IDs above are examples; use the model's verified tokenizer and template.
+For long Windows prompts, use `--tokens-file prompt.ids --follow-file follow.ids`
+instead of embedding ID lists in the command line. These files contain decimal
+IDs separated by commas, with optional whitespace. The third patch adds these
+flags so 32K–256K test inputs fit Windows' command-line limit. Context capacity
+and model quality still require separate validation.
 The launcher fixes skip policies to zero, disables draft/lookup/graphs, uses
 FP16 KV and a one-token window, and freezes expert residency for comparisons.
 It rejects conflicting forwarded options. `--dry-run` prints exact arguments

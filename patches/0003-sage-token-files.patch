@@ -1,0 +1,41 @@
+--- a/src/poly/main.cpp
++++ b/src/poly/main.cpp
+@@ -7,6 +7,9 @@
+ // STOP and QUIT in, and RESUME, PP, T, DONE and ERR out.
+ #include "conversations.hpp"
+ #include "engine.hpp"
++#ifdef STRATA_SAGE_INTEGRATION
++#include "sage/token_file.hpp"
++#endif
+ #include "guesses.hpp"
+ #include "strata/core/conversation_memory.hpp"
+ #include "strata/spec/draft_policy.hpp"
+@@ -1025,6 +1028,10 @@
+ void usage() {
+     std::fprintf(stderr,
+                  "usage: strata-poly --model FILE.gguf (--serve | --tokens ID,ID,... [--max-new N])\n"
++#ifdef STRATA_SAGE_INTEGRATION
++                 "  --tokens-file FILE    prompt IDs from a comma-separated text file (long Windows prompts)\n"
++                 "  --follow-file FILE    teacher-forced continuation IDs from a comma-separated text file\n"
++#endif
+                  "  --max-context N        tokens the attention caches hold (default 8192)\n"
+                  "  --threads N            CPU threads for the experts that are not in VRAM (default: all usable)\n"
+                  "  --vram-reserve-mib N   VRAM left free beside the expert cache, 256 at least (default: a\n"
+@@ -1201,6 +1208,17 @@
+         else if (a == "--top-p") s.top_p = std::strtof(val(), nullptr);
+         else if (a == "--min-p") s.min_p = std::strtof(val(), nullptr);
+         else if (a == "--seed") s.seed = std::strtoull(val(), nullptr, 10);
++#ifdef STRATA_SAGE_INTEGRATION
++        else if (a == "--tokens-file" || a == "--follow-file") {
++            try {
++                auto parsed = sage::strata::read_token_file(val());
++                (a == "--tokens-file" ? ids : follow) = std::move(parsed);
++            } catch (const std::exception& error) {
++                std::fprintf(stderr, "strata-poly: %s: %s\n", a.c_str(), error.what());
++                return 2;
++            }
++        }
++#endif
+         else if (a == "--tokens" || a == "--eos-ids" || a == "--follow") {
+             if (!parse_ids(val(), a == "--tokens" ? ids : a == "--eos-ids" ? eos : follow)) {
+                 std::fprintf(stderr, "strata-poly: %s takes token ids separated by commas\n", a.c_str());
