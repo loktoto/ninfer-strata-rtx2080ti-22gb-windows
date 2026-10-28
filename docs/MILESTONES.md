@@ -42,3 +42,10 @@ See TEST_READINESS.md for unimplemented or hardware-blocked acceptance work.
 [DONOR_REVIEW.md](DONOR_REVIEW.md) records the exact donor revisions, upstream
 release claims and model/format boundaries. No benchmark from another model
 is treated as Sage evidence.
+
+2026-10-28 owner scope change: Turing Unlock and unlock-aware tuning are deferred.
+Current development and release acceptance focus on Strata + NInfer using normal
+SM75. Schema-version-2 evidence records this explicitly, keeps G5/G6 deferred,
+and retains native Windows evidence requirements for G1–G4/G7. The original
+schema-version-1 unlock contract is preserved. Scope validation and the full
+Python suite pass (87 tests); this changes no hardware gate to passed.

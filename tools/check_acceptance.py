@@ -45,13 +45,25 @@ def check(manifest, base):
         return expected
     if not isinstance(manifest, dict):
         return {"valid": False, "errors": ["manifest must be an object"], "hardware_unlocked": False}
-    require(manifest.get("schema_version") == 1, "schema_version must be 1")
+    version = manifest.get("schema_version")
+    require(type(version) is int and version in (1, 2), "schema_version must be 1 or 2")
+    # Version 1 preserves the original three-component acceptance contract.
+    # Version 2 explicitly selects the current Strata + NInfer release scope.
+    profile = manifest.get("profile")
+    if version == 2:
+        require(profile == "strata_ninfer", "schema_version 2 requires profile strata_ninfer")
+    else:
+        require(profile is None, "schema_version 1 cannot select a different acceptance profile")
+    deferred = {"G5", "G6"} if version == 2 and profile == "strata_ninfer" else set()
     gates = manifest.get("gates")
     if not isinstance(gates, dict) or set(gates) != set(GATES):
         errors.append("gates must contain exactly G1 through G7")
         gates = {}
     for gate, value in gates.items():
-        require(isinstance(value, dict) and value.get("status") in {"not_run", "failed", "passed"}, f"{gate}: invalid status")
+        if gate in deferred:
+            require(isinstance(value, dict) and value.get("status") == "deferred", f"{gate}: must be deferred for strata_ninfer")
+        else:
+            require(isinstance(value, dict) and value.get("status") in {"not_run", "failed", "passed"}, f"{gate}: invalid status")
     passed = [g for g in GATES if isinstance(gates.get(g), dict) and gates[g].get("status") == "passed"]
     if passed:
         inv = manifest.get("inventory")
@@ -119,7 +131,8 @@ def check(manifest, base):
                     require(a.get("raw_result") != b.get("raw_result"), "MMA pair must have separate raw results")
     return {"valid": not errors, "errors": errors, "submitted_passed_gates": passed,
             "assessment": "candidate_evidence_requires_review" if passed and not errors else "no_accepted_hardware_claim",
-            "hardware_unlocked": False}
+            "hardware_unlocked": False, "profile": profile or "strata_ninfer_unlock",
+            "required_gates": [g for g in GATES if g not in deferred], "deferred_gates": sorted(deferred)}
 
 
 def main():

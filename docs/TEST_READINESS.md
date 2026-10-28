@@ -1,7 +1,8 @@
 # Testing readiness and remaining blockers — 2026-10-28
 
 This is a development system prepared for target testing. It is not a completed
-G1–G7 release, and no hardware gate is marked passed.
+Strata + NInfer release, and no hardware gate is marked passed. The owner has
+deferred Turing Unlock: active gates are G1–G4/G7; G5/G6 are outside this release.
 
 Implemented and locally checked:
 
@@ -16,7 +17,7 @@ Implemented and locally checked:
 - A true native SM75 FP16 MMA probe for matched post-driver experiments.
   Labels never certify lock state. Output correctness/timing are untested here.
 - Linux CUDA 13 SM75 compile/link checks for the complete patched runtime and
-  probe and Q6_K oracle; nine host C++ suites and 83 Python tests passed.
+  probe and Q6_K oracle; nine host C++ suites passed; the latest acceptance-scope update passes 87 Python tests.
 - A Windows development ZIP packager with recursive DLL import checks,
   source fingerprints and per-file hashes. Native packaging remains untested.
 
@@ -25,6 +26,7 @@ NInfer-all comparison, RESEARCH_FINDINGS.md for unlock research and references,
 SCHEDULER_VALIDATION.md for the ordering analysis, and TESTING.md for the fixture
 manifest and test procedure. The hardware workflow prepares Python/MSVC build
 tools and retains raw kernel outputs plus tested binary hashes as an artifact.
+Its MMA diagnostic is optional and disabled by default; it is not an unlock test.
 
 The following still prevent full completion:
 
@@ -35,8 +37,6 @@ The following still prevent full completion:
 | G1 / G2 | Actual 32K input consumption, GPU operator oracles and complete-logit comparisons on that target; source/build success is insufficient |
 | G3 | GPU delayed-copy and failure injection, adaptive eviction/KV relocation and graph replay validation; ownership audit alone is insufficient |
 | G4 | Real long-document/retrieval quality assertions and reviewed free-generation outputs at each stage; the runner records expectations but does not score semantics |
-| G5 | Windows UEFI hardware adapter and recovery/handoff implementation remain unfinished; Linux evidence and host synthetic tests do not establish Windows unlock |
-| G6 | Matched locked/unlocked MMA and full-model experiments, followed by evidence-backed automatic kernel selection; no unlocked autotuner is claimed |
 | G7 | Target MTP correctness, streaming/concurrency, endurance, Windows package/DLL and rollback qualification remain pending |
 
 GitHub hosted jobs previously could not start because of the account
@@ -45,6 +45,6 @@ was still queued at the last observation; a queued job supplies no GPU evidence.
 The latest source must be tested by its exact commit, not an older queued revision.
 
 Do not flash firmware or change boot/watchdog settings as part of these tests.
-The supplied runtime/probe/workflows perform none of those operations. Windows
-unlock development requires its own reviewed hardware procedure before any
-locked/unlocked comparison can qualify G5 or G6.
+The supplied runtime/probe/workflows perform none of those operations. G5/G6
+are deferred; no Windows unlock work or qualification is required for the current
+Strata + NInfer release. A future unlock phase needs separate hardware validation.

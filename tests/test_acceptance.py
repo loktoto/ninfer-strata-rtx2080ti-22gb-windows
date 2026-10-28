@@ -51,6 +51,54 @@ class AcceptanceTest(unittest.TestCase):
         m["post_driver_mma"] = {"benchmark": self.benchmark, "locked": run, "unlocked": dict(run, raw_result=self.result2)}
         return m
 
+    def current_scope(self):
+        m = copy.deepcopy(self.manifest)
+        m.update(schema_version=2, profile="strata_ninfer")
+        for gate in ("G5", "G6"):
+            m["gates"][gate] = {"status": "deferred"}
+        return m
+
+    def test_current_scope_defers_unlock_without_accepting_it(self):
+        m = self.current_scope()
+        r = self.check(m)
+        self.assertTrue(r["valid"], r["errors"])
+        self.assertEqual(r["required_gates"], ["G1", "G2", "G3", "G4", "G7"])
+        self.assertEqual(r["deferred_gates"], ["G5", "G6"])
+        self.assertFalse(r["hardware_unlocked"])
+        m["gates"]["G1"] = self.passed("G1")["gates"]["G1"]
+        r = self.check(m)
+        self.assertTrue(r["valid"], r["errors"])
+        self.assertEqual(r["assessment"], "candidate_evidence_requires_review")
+        self.assertNotIn("post_driver_mma", m)
+
+    def test_deferred_gates_cannot_claim_pass(self):
+        for gate in ("G5", "G6"):
+            m = self.current_scope()
+            m["gates"][gate] = self.passed(gate)["gates"][gate]
+            self.assertFalse(self.check(m)["valid"])
+
+    def test_scope_is_explicit_and_legacy_contract_is_preserved(self):
+        m = self.current_scope()
+        del m["profile"]
+        self.assertFalse(self.check(m)["valid"])
+        m = self.current_scope()
+        m["profile"] = "anything"
+        self.assertFalse(self.check(m)["valid"])
+        m = self.passed("G6")
+        del m["post_driver_mma"]
+        self.assertFalse(self.check(m)["valid"])
+        m = self.current_scope()
+        m["schema_version"] = 1
+        self.assertFalse(self.check(m)["valid"])
+
+    def test_active_gate_still_needs_real_hardware_evidence(self):
+        m = self.current_scope()
+        m["gates"]["G2"] = {"status": "passed"}
+        self.assertFalse(self.check(m)["valid"])
+        m = self.current_scope()
+        m["gates"]["G3"] = {"status": "deferred"}
+        self.assertFalse(self.check(m)["valid"])
+
     def test_not_run_has_no_claim(self):
         r = self.check(self.manifest)
         self.assertTrue(r["valid"])

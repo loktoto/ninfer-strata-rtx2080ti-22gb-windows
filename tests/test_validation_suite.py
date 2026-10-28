@@ -50,7 +50,9 @@ class SuiteTests(unittest.TestCase):
             dry = json.loads((base / 'dry/suite.json').read_text())
             self.assertIn('--full-logits', dry['stages'][0]['diagnostic_argv'])
             self.assertNotIn('--dump-layers', dry['stages'][0]['benchmarks']['baseline']['argv'])
-            self.assertTrue(all(value == 'not_established' for value in dry['gates'].values()))
+            self.assertEqual(dry['profile'], 'strata_ninfer')
+            self.assertEqual({g for g, status in dry['gates'].items() if status == 'deferred'}, {'G5', 'G6'})
+            self.assertTrue(all(dry['gates'][g] == 'not_established' for g in ('G1', 'G2', 'G3', 'G4', 'G7')))
             completed = mock.Mock(returncode=0)
             failed = mock.Mock(returncode=1)
             with mock.patch.object(suite.platform, 'system', return_value='Windows'), mock.patch.object(suite.subprocess, 'run', side_effect=[completed, failed]) as run:
