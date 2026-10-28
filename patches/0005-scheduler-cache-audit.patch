@@ -1,0 +1,132 @@
+diff --git a/src/poly/engine.cpp b/src/poly/engine.cpp
+index aea161d..1008af3 100644
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -410,6 +410,51 @@ struct Engine::Swap {
+     cudaEvent_t done = nullptr;    // marks its upload
+ };
+ 
++// Optional audit of the engine's own slot metadata. This checks ownership and bounds,
++// not GPU completion: the existing stream barriers and events provide that ordering.
++void Engine::audit_cache(const char* where) const {
++    const char* enabled = std::getenv("STRATA_SAGE_AUDIT_CACHE");
++    if (!enabled || std::strcmp(enabled, "1") != 0) return;
++    const auto fail = [where](const char* reason) {
++        throw std::logic_error(std::string("expert cache audit at ") + where + ": " + reason);
++    };
++    struct Range { size_t begin, end; };
++    std::vector<Range> ranges;
++    const uintptr_t base = reinterpret_cast<uintptr_t>(exp_);
++    const auto add = [&](const uint8_t* slot, size_t bytes) {
++        const uintptr_t address = reinterpret_cast<uintptr_t>(slot);
++        if (!exp_ || address < base || address - base > exp_at_ ||
++            bytes > exp_at_ - (address - base)) fail("slot outside the allocated extent");
++        ranges.push_back({size_t(address - base), size_t(address - base) + bytes});
++    };
++    if (vmm_ && exp_ && exp_at_ && (exp_at_ > arena_.mapped || kTail > arena_.mapped - exp_at_))
++        fail("allocated extent exceeds mapped arena");
++    for (const Layer& layer : layers_)
++        for (const uint8_t* slot : layer.slot)
++            if (slot) add(slot, layer.slot_bytes);
++    std::vector<uint8_t> seen(coming_.size(), 0);
++    for (int j = 0; j < n_swap_; ++j) {
++        const Swap& s = swap_[(size_t) j];
++        const int state = s.at.load();
++        if (state == Swap::kFree) continue;
++        if (state != Swap::kAsked && state != Swap::kSent) fail("unknown upload state");
++        if (s.il < 0 || size_t(s.il) >= layers_.size() || s.e < 0 || s.e >= n_expert_)
++            fail("upload target is invalid");
++        const Layer& layer = layers_[(size_t) s.il];
++        const size_t i = size_t(s.il) * size_t(n_expert_) + size_t(s.e);
++        if (size_t(s.e) >= layer.slot.size() || i >= coming_.size() || !coming_[i] || seen[i] || layer.slot[(size_t) s.e])
++            fail("upload target ownership is inconsistent");
++        seen[i] = 1;
++        add(s.slot, layer.slot_bytes);
++    }
++    for (size_t i = 0; i < coming_.size(); ++i)
++        if (!!coming_[i] != !!seen[i]) fail("orphaned upload target");
++    std::sort(ranges.begin(), ranges.end(), [](const Range& a, const Range& b) { return a.begin < b.begin; });
++    for (size_t i = 1; i < ranges.size(); ++i)
++        if (ranges[i].begin < ranges[i - 1].end) fail("overlapping slot owners");
++    if (ranges.size() != size_t(cached_)) fail("cached count disagrees with slot owners");
++}
++
+ Engine::Engine() = default;
+ 
+ Engine::~Engine() {
+@@ -847,6 +892,7 @@ void Engine::shrink_cache(size_t bytes) {
+     // another program takes VRAM), which is exactly the change the freeze is there to keep out.  A frozen
+     // answer's cache is the one its first token saw; the request after it may size it again.
+     if (freeze_experts_) return;
++    audit_cache("before shrink");
+     size_t cut = arena_.mapped;
+     for (size_t i = arena_.pieces.size(); i > 0 && arena_.mapped - cut < bytes; --i) cut -= arena_.pieces[i - 1].second;
+     settle_swaps();
+@@ -900,6 +946,7 @@ void Engine::shrink_cache(size_t bytes) {
+     if (cut > kTail) zero_vram(exp_ + end, kTail);
+     exp_at_ = std::min(exp_at_, end);
+     staged_il_ = -1;
++    audit_cache("after shrink");
+ }
+ 
+ float* Engine::fbuf(size_t n) {
+@@ -1372,6 +1419,7 @@ void Engine::resize_card_cache(int mib) {
+     opt_.vram_reserve_mib = mib < 0 ? asked_reserve_mib_ : mib;
+     fill_expert_cache();
+     start_swaps();
++    audit_cache("after resize");
+ }
+ 
+ // The launches the engine records as it runs take VRAM after the cache was sized: 180 to 200 MiB of an 8 GB card,
+@@ -1495,6 +1543,7 @@ int Engine::grow_cache(size_t bytes) {
+     // As shrink_cache(): a frozen answer's cache does not change under it.
+     if (freeze_experts_) return 0;
+     settle_swaps();
++    audit_cache("before grow");
+     ck(cudaStreamSynchronize(cs(st_)), "the expert cache");
+     if (swap_st_) ck(cudaStreamSynchronize(cs(swap_st_)), "the expert cache");
+     struct Cand {
+@@ -1544,6 +1593,7 @@ int Engine::grow_cache(size_t bytes) {
+     }
+     staged_il_ = -1;
+     held_is_budget();
++    audit_cache("after grow");
+     return (int) taken.size();
+ }
+ 
+@@ -1624,6 +1674,7 @@ void Engine::follow(int written) {
+         }
+         n_free += s.at.load() == Swap::kFree;
+     }
++    audit_cache("upload publication");
+     if (written <= 0) return;
+     const float keep = std::exp2(-(float) written / (float) kSwapHalf);
+     for (float& r : recent_) r *= keep;
+@@ -1696,6 +1747,7 @@ void Engine::follow(int written) {
+         s->at.store(Swap::kAsked);
+         asked = true;
+     }
++    audit_cache("upload reservation");
+     if (asked) {
+         { std::lock_guard<std::mutex> l(swap_m_); }
+         swap_cv_.notify_one();
+@@ -1814,6 +1866,7 @@ void Engine::load(const Options& o) {
+     alloc();
+     if (!opt_.profile.empty()) read_profile(opt_.profile, (int) layers_.size(), n_expert_, prior_);
+     fill_expert_cache();
++    audit_cache("after initial allocation");
+     // The weights and the expert cache are written on st_ now (h2d(), zero_vram()): the load is not over until
+     // those are done, so that everything after it - a read of what the cache holds, the first request's cover()
+     // mapping the attention caches - finds what it expects.
+diff --git a/src/poly/engine.hpp b/src/poly/engine.hpp
+index 8efdf0f..00a1cf0 100644
+--- a/src/poly/engine.hpp
++++ b/src/poly/engine.hpp
+@@ -525,6 +525,7 @@ protected:
+     int64_t kv_rows_for(int64_t end) const;   ///< the rows cover() maps for `end`
+     void held_is_budget();
+     void settle_swaps();
++    void audit_cache(const char* where) const;
+ 
+     Options opt_;
+     std::unique_ptr<Shards> gg_;
