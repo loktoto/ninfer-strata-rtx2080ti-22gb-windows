@@ -11,11 +11,13 @@ jobs:
         shell: powershell
         run: .\tools\build_windows.ps1
       - name: Build numerical and host tests
-        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity slot_pool_test --parallel 2
+        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_mma_probe slot_pool_test --parallel 2
       - name: Run independent kernel oracle
         run: .\build-windows\kernels\sage_rmsnorm_parity.exe
       - name: Run expert-slot oracle
         run: .\build-windows\kernels\sage_q4k_slots_parity.exe
+      - name: Probe native FP16 MMA without asserting unlock state
+        run: .\build-windows\kernels\sage_mma_probe.exe
       - name: Run host scheduler contracts
         run: .\build-windows\slot_pool_test.exe
       - name: Run Python contracts

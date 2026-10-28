@@ -49,4 +49,4 @@ jobs:
       - name: Compile kernel library and parity executables (no GPU execution)
         run: >-
           cmake --build build-cuda --parallel 2 --target
-          sage_sm75_kernels sage_rmsnorm_parity sage_q4k_slots_parity
+          sage_sm75_kernels sage_rmsnorm_parity sage_q4k_slots_parity sage_mma_probe
