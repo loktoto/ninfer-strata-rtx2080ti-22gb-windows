@@ -25,7 +25,7 @@ jobs:
         shell: powershell
         run: .\tools\build_windows.ps1
       - name: Build numerical and host tests
-        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_mma_probe slot_pool_test strata_policy_test strata_expert_q4k_test q4k_oracle_test token_file_test logit_dump_test dispatch_trace_test --parallel 2
+        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity sage_mma_probe slot_pool_test strata_policy_test strata_expert_q4k_test q4k_oracle_test token_file_test logit_dump_test dispatch_trace_test strata_expert_q6k_test q6k_oracle_test --parallel 2
       - name: Run independent kernel oracle
         run: |
           & .\build-windows\kernels\sage_rmsnorm_parity.exe 2>&1 | Tee-Object evidence/hardware-run/rmsnorm.txt
@@ -34,18 +34,22 @@ jobs:
         run: |
           & .\build-windows\kernels\sage_q4k_slots_parity.exe 2>&1 | Tee-Object evidence/hardware-run/q4k.txt
           if ($LASTEXITCODE -ne 0) { throw 'Expert-slot numerical validation failed' }
+      - name: Run Q6_K expert-slot oracle
+        run: |
+          & .\build-windows\kernels\sage_q6k_slots_parity.exe 2>&1 | Tee-Object evidence/hardware-run/q6k.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Q6_K numerical validation failed' }
       - name: Probe native FP16 MMA without asserting unlock state
         run: |
           & .\build-windows\kernels\sage_mma_probe.exe 2>&1 | Tee-Object evidence/hardware-run/mma.txt
           if ($LASTEXITCODE -ne 0) { throw 'FP16 MMA validation failed' }
       - name: Run host scheduler contracts
-        run: ctest --test-dir build-windows --output-on-failure -R '^(slot_pool|strata_policy|strata_expert_q4k|q4k_oracle_fixture|token_file|logit_dump|dispatch_trace)$'
+        run: ctest --test-dir build-windows --output-on-failure -R '^(slot_pool|strata_policy|strata_expert_q4k|strata_expert_q6k|q6k_oracle_fixture|q4k_oracle_fixture|token_file|logit_dump|dispatch_trace)$'
       - name: Run Python contracts
         run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Record tested binary identities
         if: always()
         run: |
-          $Records = @('build-windows/strata/strata-poly.exe', 'build-windows/kernels/sage_rmsnorm_parity.exe', 'build-windows/kernels/sage_q4k_slots_parity.exe', 'build-windows/kernels/sage_mma_probe.exe') | Where-Object { Test-Path $_ } | ForEach-Object { Get-FileHash $_ -Algorithm SHA256 | Select-Object Path,Hash }
+          $Records = @('build-windows/strata/strata-poly.exe', 'build-windows/kernels/sage_rmsnorm_parity.exe', 'build-windows/kernels/sage_q4k_slots_parity.exe', 'build-windows/kernels/sage_mma_probe.exe', 'build-windows/kernels/sage_q6k_slots_parity.exe') | Where-Object { Test-Path $_ } | ForEach-Object { Get-FileHash $_ -Algorithm SHA256 | Select-Object Path,Hash }
           New-Item -ItemType Directory -Force evidence/hardware-run | Out-Null
           @{source_commit=$env:GITHUB_SHA; scope='kernel tests only; model and unlock gates unestablished'; binaries=@($Records)} | ConvertTo-Json -Depth 4 | Set-Content evidence/hardware-run/binaries.json
       - uses: actions/upload-artifact@v4

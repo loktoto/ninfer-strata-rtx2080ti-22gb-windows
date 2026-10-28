@@ -87,6 +87,13 @@ class StrictLauncherTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["env"]["STRATA_SAGE_EXPERT_Q4K"], "1")
         self.assertEqual(run.call_args.args[0][-2:], ["--tokens", "1,2"])
 
+    def test_q6k_is_independent_and_default_off(self):
+        _, env = launcher.launch_spec(self.engine, self.model, environ={"STRATA_SAGE_EXPERT_Q6K": "1"})
+        self.assertEqual(env["STRATA_SAGE_EXPERT_Q6K"], "0")
+        _, env = launcher.launch_spec(self.engine, self.model, ninfer_expert_q6k=True, environ={})
+        self.assertEqual(env["STRATA_SAGE_EXPERT_Q6K"], "1")
+        self.assertEqual(env["STRATA_SAGE_EXPERT_Q4K"], "0")
+
 
 if __name__ == "__main__":
     unittest.main()

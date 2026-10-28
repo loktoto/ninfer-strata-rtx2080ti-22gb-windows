@@ -1,0 +1,22 @@
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -17,6 +17,9 @@
+ #include "strata/kernels/native_mmvq.hpp"
+ #ifdef STRATA_SAGE_EXPERT_Q4K_BACKEND
+ #include "sage/strata_expert_q4k.hpp"
++#endif
++#ifdef STRATA_SAGE_EXPERT_Q6K_BACKEND
++#include "sage/strata_expert_q6k.hpp"
+ #endif
+ 
+ #include "ggml.h"
+@@ -2400,6 +2403,9 @@
+ #ifdef STRATA_SAGE_EXPERT_Q4K_BACKEND
+                 // The adapter borrows the existing slots and scratch; false enqueues nothing.
+                 if (sage::strata::try_expert_q4k_slots(type, slots, count, n_in, n_out, st_)) return true;
++#endif
++#ifdef STRATA_SAGE_EXPERT_Q6K_BACKEND
++                if (sage::strata::try_expert_q6k_slots(type, slots, count, n_in, n_out, st_)) return true;
+ #endif
+                 return count > 1 && kernels::native_mmvq_slots(type, slots, count, n_in, n_out, st_);
+             };

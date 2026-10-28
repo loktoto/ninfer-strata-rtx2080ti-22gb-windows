@@ -128,7 +128,7 @@ python tools/serve_sage.py --engine .\build-windows\strata\strata-poly.exe --mod
 Real startup is Windows-only. Linux can use local Linux-style paths with
 `--dry-run`; it cannot validate the existence of a Windows drive path.
 
-Add `--ninfer-rmsnorm` and/or `--ninfer-expert-q4k` to select the experimental
+Add `--ninfer-rmsnorm`, `--ninfer-expert-q4k` and/or `--ninfer-expert-q6k` to select the experimental
 candidates explicitly. Each flag controls its own saved environment value.
 Use a new output directory and compare against the same prompt and strict
 baseline before claiming numerical equivalence or a performance gain.

@@ -70,7 +70,7 @@ def main(argv=None):
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--model-lock", type=Path, default=ROOT / "config/model.lock.json")
     p.add_argument("--source-lock", type=Path, default=ROOT / "config/sources.lock.json")
-    p.add_argument("--candidate", choices=("rmsnorm", "expert-q4k", "both"), default="both")
+    p.add_argument("--candidate", choices=tuple(validation.CANDIDATES), default="both")
     p.add_argument("--warmups", type=int, default=1)
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--timeout", type=float, default=3600)
@@ -113,8 +113,8 @@ def main(argv=None):
             common = ["--tokens-file", str(stage_dir / "diagnostic/prompt.ids"), "--follow-file", str(stage_dir / "diagnostic/follow.ids"), "--max-context", str(stage["total_tokens"]), "--max-new", str(stage["output_tokens"]), "--seed", "1", "--temperature", "0"]
             benchmarks = {}
             for name in ("baseline", "candidate"):
-                candidate = name == "candidate"
-                cmd, env = launcher.launch_spec(args.engine, args.model, common, ninfer_rmsnorm=candidate and args.candidate in ("rmsnorm", "both"), ninfer_expert_q4k=candidate and args.candidate in ("expert-q4k", "both"))
+                selected = validation.CANDIDATES[args.candidate] if name == "candidate" else set()
+                cmd, env = launcher.launch_spec(args.engine, args.model, common, ninfer_rmsnorm="rmsnorm" in selected, ninfer_expert_q4k="expert-q4k" in selected, ninfer_expert_q6k="expert-q6k" in selected)
                 benchmarks[name] = {"argv": cmd, "controlled_environment": {k: env[k] for k in ENV_KEYS}}
             planned.append({**stage, "diagnostic_argv": diagnostic, "benchmarks": benchmarks, "status": "not_run", "semantic_quality": "not_assessed"})
         output.mkdir(parents=True)
