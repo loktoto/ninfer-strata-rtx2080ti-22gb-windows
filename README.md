@@ -10,6 +10,12 @@ does not yet provide a qualified Windows executable. No throughput or 256K-conte
 by the project owner; it is not a dependency of this release. Preserve its
 research for a later phase. See the [active roadmap](docs/ROADMAP.md).
 
+The owner's current test target is **Sage-A1.5 IQ4_XS, MTP4, 32K configured
+capacity**. Read [IQ4_XS testing readiness](docs/IQ4XS_TESTING.md) before testing:
+current strict launchers disable MTP and the original Q4_K_M model lock cannot
+qualify a different IQ4_XS file. Developer smoke testing is prepared; a matched
+IQ4_XS/MTP4 performance comparison is not yet prepared.
+
 ## What is implemented
 
 - Pinned PolyStrata integration patch and reproducible source preparation.
@@ -26,7 +32,7 @@ research for a later phase. See the [active roadmap](docs/ROADMAP.md).
 - An official Sage model lock and bounded GGUF tensor inventory tool.
 - Windows hardware inventory capture and host test CI for Windows/Linux.
 
-The unlock repository is retained as deferred research only. Its current host parser tests
+The unlock repository is retained in a separate deferred research lock only. Its current host parser tests
 are not hardware unlock evidence. See [architecture and gates](docs/ARCHITECTURE.md).
 
 ## Host development checks

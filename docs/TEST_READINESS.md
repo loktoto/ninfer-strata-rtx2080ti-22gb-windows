@@ -4,6 +4,10 @@ This is a development system prepared for target testing. It is not a completed
 Strata + NInfer release, and no hardware gate is marked passed. The owner has
 deferred Turing Unlock: active gates are G1–G4/G7; G5/G6 are outside this release.
 
+The owner now reports IQ4_XS/MTP4 at a 32K configured limit. This differs from
+the locked Q4_K_M/non-MTP validation path. See [IQ4XS_TESTING.md](IQ4XS_TESTING.md)
+for the supported smoke test and remaining model/format/speculation gaps.
+
 Implemented and locally checked:
 
 - One compiled Strata-owned runtime, with opt-in NInfer-derived FP32 RMSNorm
@@ -17,7 +21,8 @@ Implemented and locally checked:
 - A true native SM75 FP16 MMA probe for matched post-driver experiments.
   Labels never certify lock state. Output correctness/timing are untested here.
 - Linux CUDA 13 SM75 compile/link checks for the complete patched runtime and
-  probe and Q6_K oracle; nine host C++ suites passed; the latest acceptance-scope update passes 87 Python tests.
+  probe and Q6_K oracle; nine host C++ suites and 88 Python tests passed
+  after the acceptance-scope and IQ4_XS inventory updates.
 - A Windows development ZIP packager with recursive DLL import checks,
   source fingerprints and per-file hashes. Native packaging remains untested.
 

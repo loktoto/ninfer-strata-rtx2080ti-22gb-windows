@@ -49,3 +49,9 @@ SM75. Schema-version-2 evidence records this explicitly, keeps G5/G6 deferred,
 and retains native Windows evidence requirements for G1–G4/G7. The original
 schema-version-1 unlock contract is preserved. Scope validation and the full
 Python suite pass (87 tests); this changes no hardware gate to passed.
+
+IQ4_XS readiness follow-up: the owner clarified that 32K is the configured
+context limit. Documented the exact-format and MTP4 qualification gaps; corrected
+the GGUF recipe-name inventory for IQ4_XS (recipe ID 30 versus tensor type 23).
+Moved inactive unlock source metadata out of the build source lock. No IQ4_XS
+GPU expert acceleration or MTP4 qualification is claimed.
