@@ -6,7 +6,7 @@ G1–G7 release, and no hardware gate is marked passed.
 Implemented and locally checked:
 
 - One compiled Strata-owned runtime, with opt-in NInfer-derived FP32 RMSNorm
-  and direct cached Q4_K slot operations. No second expert weight bank.
+  and direct cached Q4_K/Q6_K slot operations. No second expert weight bank.
 - Exact long token-file inputs; full FP32 teacher-forced logit capture and
   comparison; optional evidence that selected dispatch paths were enqueued.
 - Opt-in live cache ownership auditing at allocation/publication/resize
@@ -16,9 +16,12 @@ Implemented and locally checked:
 - A true native SM75 FP16 MMA probe for matched post-driver experiments.
   Labels never certify lock state. Output correctness/timing are untested here.
 - Linux CUDA 13 SM75 compile/link checks for the complete patched runtime and
-  probe; seven host C++ suites and 72 Python tests passed.
+  probe and Q6_K oracle; nine host C++ suites and 83 Python tests passed.
+- A Windows development ZIP packager with recursive DLL import checks,
+  source fingerprints and per-file hashes. Native packaging remains untested.
 
-Read RESEARCH_FINDINGS.md for the Terra research and source references,
+Read [DONOR_REVIEW.md](DONOR_REVIEW.md) for the current mr-september and
+NInfer-all comparison, RESEARCH_FINDINGS.md for unlock research and references,
 SCHEDULER_VALIDATION.md for the ordering analysis, and TESTING.md for the fixture
 manifest and test procedure. The hardware workflow prepares Python/MSVC build
 tools and retains raw kernel outputs plus tested binary hashes as an artifact.

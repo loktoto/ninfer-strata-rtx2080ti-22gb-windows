@@ -17,9 +17,11 @@ Create token JSON files containing exactly `prompt_ids` and `follow_ids` integer
 First prepare a reviewable command inventory on any platform, then run the same command on native Windows after removing `--dry-run` and choosing a new output directory:
 
 ```powershell
-python tools/run_validation_suite.py --engine C:\build\engine.exe --model C:\models\model.gguf --manifest C:\fixtures\manifest.json --output C:\results\review --dry-run
-python tools/run_validation_suite.py --engine C:\build\engine.exe --model C:\models\model.gguf --manifest C:\fixtures\manifest.json --output C:\results\run1
+python tools/run_validation_suite.py --engine C:\build\engine.exe --model C:\models\model.gguf --manifest C:\fixtures\manifest.json --candidate all --output C:\results\review --dry-run
+python tools/run_validation_suite.py --engine C:\build\engine.exe --model C:\models\model.gguf --manifest C:\fixtures\manifest.json --candidate all --output C:\results\run1
 ```
+
+`--candidate all` enables the RMSNorm, Q4_K and Q6_K candidates for comparison. The default `both` retains RMSNorm plus Q4_K for existing invocations. A selected candidate need not be exercised by every workload: run `validate_model.py --require-dispatch` separately with representative routed experts to require evidence of host enqueue for each selected path. Enqueue evidence does not establish GPU numerical correctness.
 
 Full-logit tolerances are fixed by `--logits-atol` and `--logits-rtol` (defaults 0.0001 and 0.001); record and review them before running. Every stage captures baseline and candidate teacher-forced full logits and compares them, stopping before the next stage on a failure. Match of forced IDs is a protocol check, not proof of quality. Logs, raw logits, invocation parameters and per-run outputs are preserved. Real execution requires substantial time and storage, especially for full logits. Inspect the diagnostic report and actual source/build provenance. Do not treat execution completion as approval of G1–G7.
 
