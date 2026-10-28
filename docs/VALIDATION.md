@@ -5,8 +5,8 @@ This is an initial source implementation, not a passed P1 or release milestone.
 | Check | Observed result |
 | --- | --- |
 | Linux GCC 14.2 / CMake 4.4.4 Release host build | Passed |
-| Host CTest suites including 256K token-file parsing | 5/5 passed |
-| Python inspector, launch, API and validation contracts | 51/51 passed |
+| Host CTest suites including logit writer and dispatch traces | 7/7 passed |
+| Python inspector, launch, API, full-logit, suite and evidence contracts | 72/72 passed |
 | Slot policy strict compiler warnings | Passed |
 | Slot policy ASan + UBSan | Passed |
 | Patch against locked PolyStrata commit | Applied successfully |
@@ -55,6 +55,13 @@ test of the model's reasoning quality.
 
 See FULL_RUNTIME_BUILD.md for the complete runtime build command, artifact
 fingerprint and exact scope of the driver-stub CLI checks.
+
+On 2026-10-28 the runtime rebuilt and linked after all six integration patches,
+including full-logit capture, live ownership auditing and dispatch tracing. Its
+help smoke printed `--logits-file`; the official driver stub was used solely for
+loader resolution. The native FP16 MMA probe also compiled/linked for SM75 and
+exited nonzero at device discovery because no working GPU driver is present.
+No new hardware gate is established by these checks.
 
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do
