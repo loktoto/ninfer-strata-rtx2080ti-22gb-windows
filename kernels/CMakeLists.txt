@@ -22,3 +22,6 @@ target_link_libraries(sage_q4k_slots_parity PRIVATE sage_sm75_kernels CUDA::cuda
 if(BUILD_TESTING)
   add_test(NAME sage_q4k_slots_parity COMMAND sage_q4k_slots_parity)
 endif()
+add_executable(sage_mma_probe src/mma_probe.cu)
+target_link_libraries(sage_mma_probe PRIVATE CUDA::cudart)
+set_target_properties(sage_mma_probe PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_ARCHITECTURES 75)
