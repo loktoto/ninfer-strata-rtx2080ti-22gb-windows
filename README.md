@@ -15,6 +15,8 @@ does not yet provide a qualified Windows executable or a verified Windows GPU un
 - A strict baseline launcher that disables expert skipping and speculative decode.
 - An opt-in Q4_K expert-slot GEMV path using Strata-owned Q8_1 scratch and its
   existing stream, with independent GPU oracle tests; numerical qualification pending.
+- An opt-in Q6_K expert path adapted from NInfer-all, borrowing the same slots
+  without converting weights.
 - Host slot-generation/reader-lease and KV-budget contracts, tested independently;
   these are not yet connected to Strata's CUDA events or live eviction logic.
 - An official Sage model lock and bounded GGUF tensor inventory tool.
@@ -129,3 +131,9 @@ Current [testing readiness and blockers](docs/TEST_READINESS.md),
 [Terra research](docs/RESEARCH_FINDINGS.md), [full-logit validation](docs/LOGIT_VALIDATION.md)
 and [staged testing procedure](docs/TESTING.md) describe the next target-machine
 work. Hardware acceptance, Windows unlock and a qualified release remain pending.
+
+The [Q6_K donor integration](docs/Q6K_DONOR.md) is selected with
+`--ninfer-expert-q6k` in strict/API launchers. Validation accepts
+`--candidate expert-q6k` or `--candidate all`; `both` retains RMSNorm plus Q4_K.
+All candidates remain off by default. The [Windows testing packager](docs/WINDOWS_PACKAGE.md)
+resolves transitive DLL imports for an unqualified development ZIP.
