@@ -15,6 +15,7 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import struct
 import time
 
 
@@ -23,6 +24,9 @@ _spec = importlib.util.spec_from_file_location(
     "validation_strict_launcher", ROOT / "integration/strata/launch_strict.py")
 _launcher = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_launcher)
+_compare_spec = importlib.util.spec_from_file_location("full_logits_comparator", ROOT / "tools/compare_logits.py")
+_comparator = importlib.util.module_from_spec(_compare_spec)
+_compare_spec.loader.exec_module(_comparator)
 ENV_KEYS = ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS",
             "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K")
 INT32_MAX = 2 ** 31 - 1
@@ -214,12 +218,17 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=3600, help="Seconds per engine run")
     parser.add_argument("--hash-model", action="store_true", help="Read and verify the entire GGUF once")
     parser.add_argument("--dry-run", action="store_true", help="Write launch inventory without running; allowed on Linux")
+    parser.add_argument("--full-logits", action="store_true", help="Capture and compare every teacher-forced FP32 logit")
+    parser.add_argument("--logits-atol", type=float, default=1e-4)
+    parser.add_argument("--logits-rtol", type=float, default=1e-3)
     args = parser.parse_args(argv)
     try:
         if not args.dry_run and platform.system() != "Windows":
             raise ValueError("Real runs require native Windows; use --dry-run for Linux/WSL inventory")
         if args.output.exists():
             raise ValueError("Output already exists; choose a new directory")
+        if any(not math.isfinite(t) or t < 0 for t in (args.logits_atol, args.logits_rtol)):
+            raise ValueError("logit tolerances must be finite and nonnegative")
         prompt, follow = load_tokens(args.tokens_file)
         max_new = len(follow) if args.max_new is None else args.max_new
         if max_new != len(follow):
@@ -241,7 +250,7 @@ def main(argv=None):
         for name, rmsnorm, q4k in [("baseline", False, False),
                                     ("candidate", args.candidate in {"rmsnorm", "both"},
                                      args.candidate in {"expert-q4k", "both"})]:
-            command, env = _launcher.launch_spec(args.engine, args.model, common,
+            command, env = _launcher.launch_spec(args.engine, args.model, common + (["--logits-file", str(output / f"{name}.logits")] if args.full_logits else []),
                                                 ninfer_rmsnorm=rmsnorm, ninfer_expert_q4k=q4k)
             controlled = {key: env[key] for key in ENV_KEYS}
             launches[name] = {"argv": command, "controlled_environment": controlled,
@@ -261,6 +270,7 @@ def main(argv=None):
         "strict_launcher": fingerprint(ROOT / "integration/strata/launch_strict.py"),
         "prompt_tokens": len(prompt), "generation_budget": max_new, "max_context": max_context,
         "seed": args.seed, "timeout_seconds": args.timeout,
+        "full_logits": {"requested": args.full_logits, "atol": args.logits_atol, "rtol": args.logits_rtol},
         "token_files": {name: fingerprint(output / f"{name}.ids") for name in ("prompt", "follow")},
         "launches": launches, "runs": {}, "gates": {"G1": "not_established", "G2": "not_established"},
         "limitations": ["Teacher-forced output equality is a protocol check, not a comparison of model picks.",
@@ -277,6 +287,19 @@ def main(argv=None):
         report["comparison"] = compare_runs(report["runs"]["baseline"], report["runs"]["candidate"])
         if all(run["status"] == "completed_unqualified" for run in report["runs"].values()):
             report["status"] = "completed_unqualified"
+        if args.full_logits:
+            comparison = {"status": "failed", "atol": args.logits_atol, "rtol": args.logits_rtol}
+            try:
+                result = _comparator.compare(output / "baseline.logits", output / "candidate.logits",
+                                             args.logits_atol, args.logits_rtol)
+                comparison.update(result, status="passed" if result["failed"] == 0 else "failed")
+                comparison["artifacts"] = {name: fingerprint(output / f"{name}.logits")
+                                            for name in ("baseline", "candidate")}
+            except (OSError, ValueError, struct.error) as exc:
+                comparison["error"] = str(exc)
+            report["comparison"]["full_logits"] = comparison
+            if comparison["status"] == "failed":
+                report["status"] = "failed"
         write_report(output, report)
     print(f"{report['status']}: {output / 'report.json'}; G1/G2 not established")
     return 1 if report["status"] == "failed" else 0

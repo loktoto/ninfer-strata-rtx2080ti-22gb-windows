@@ -1,0 +1,105 @@
+--- a/src/poly/main.cpp
++++ b/src/poly/main.cpp
+@@ -9,6 +9,7 @@
+ #include "engine.hpp"
+ #ifdef STRATA_SAGE_INTEGRATION
+ #include "sage/token_file.hpp"
++#include "sage/logit_dump.hpp"
+ #endif
+ #include "guesses.hpp"
+ #include "strata/core/conversation_memory.hpp"
+@@ -335,6 +336,9 @@
+     Conversations<Engine> kept;   // the conversation in the engine, and the parked ones
+     Sampler sampler;
+     std::mt19937_64 rng{std::random_device{}()};
++#ifdef STRATA_SAGE_INTEGRATION
++    sage::strata::LogitDump* logit_dump = nullptr;
++#endif
+     const std::vector<int32_t>* follow = nullptr;   // --follow: the answer's tokens, taken in place of the picks
+     const float* picked_from = nullptr;             // the logits of the last token picked
+     long long asked = 0, reused = 0;   // prompt tokens of every request, and those of them not read again
+@@ -467,6 +471,9 @@
+         }
+         const auto pick = [&](const float* logits) {
+             picked_from = logits;
++#ifdef STRATA_SAGE_INTEGRATION
++            if (logit_dump) logit_dump->append(logits);
++#endif
+             if (follow && r.produced < (int64_t) follow->size()) return (*follow)[(size_t) r.produced];
+             return (int32_t) sampler.pick(logits, engine.n_vocab(), s, history, rng);
+         };
+@@ -1031,6 +1038,7 @@
+ #ifdef STRATA_SAGE_INTEGRATION
+                  "  --tokens-file FILE    prompt IDs from a comma-separated text file (long Windows prompts)\n"
+                  "  --follow-file FILE    teacher-forced continuation IDs from a comma-separated text file\n"
++                 "  --logits-file FILE    dump one full raw logit row per forced token\n"
+ #endif
+                  "  --max-context N        tokens the attention caches hold (default 8192)\n"
+                  "  --threads N            CPU threads for the experts that are not in VRAM (default: all usable)\n"
+@@ -1140,6 +1148,9 @@
+     long long max_new = 32;
+     int top_probs = 0, lookup = 3, image_pad = -1, check = 0;
+     std::string images;
++#ifdef STRATA_SAGE_INTEGRATION
++    std::string logits_file;
++#endif
+     std::vector<int32_t> ids, eos, follow;
+     for (int i = 1; i < argc; ++i) {
+         const std::string a = argv[i];
+@@ -1209,6 +1220,7 @@
+         else if (a == "--min-p") s.min_p = std::strtof(val(), nullptr);
+         else if (a == "--seed") s.seed = std::strtoull(val(), nullptr, 10);
+ #ifdef STRATA_SAGE_INTEGRATION
++        else if (a == "--logits-file") logits_file = val();
+         else if (a == "--tokens-file" || a == "--follow-file") {
+             try {
+                 auto parsed = sage::strata::read_token_file(val());
+@@ -1234,6 +1246,18 @@
+         usage();
+         return 2;
+     }
++#ifdef STRATA_SAGE_INTEGRATION
++    if (!logits_file.empty()) {
++        if (want_serve || check || !images.empty() || follow.empty() || max_new != (long long) follow.size()) {
++            std::fprintf(stderr, "strata-poly: --logits-file requires text one-shot, --follow and --max-new equal to its length\n");
++            return 2;
++        }
++        // Every row must describe the same forced prefix, including EOS tokens.
++        lookup = 0;
++        o.draft = false;
++        eos.clear();
++    }
++#endif
+     if (o.batch < 0 || o.batch > 8 || check < 0 || check > o.batch || (check > 0 && (int) ids.size() <= check)) {
+         std::fprintf(stderr, "strata-poly: --batch takes 0 to 8, and --check-batch at most --batch prompts, each "
+                              "with tokens left of --tokens\n");
+@@ -1279,7 +1303,11 @@
+         else if (far)
+             std::fprintf(stderr, "strata-poly: the experts' pages are on several NUMA nodes, %.0f%% on the fullest; "
+                                  "the CPU reads the ones far from it more slowly\n", 100.0 * engine.numa_share());
++#ifdef STRATA_SAGE_INTEGRATION
++        if (logits_file.empty() && eos.empty())
++#else
+         if (eos.empty())
++#endif
+             for (const char* key : {"tokenizer.ggml.eos_token_id", "tokenizer.ggml.eot_token_id",
+                                     "tokenizer.ggml.eom_token_id"}) {
+                 const int64_t id = engine.meta_u(key, -1);
+@@ -1315,7 +1343,17 @@
+                 if (!wrong.empty()) throw std::runtime_error(wrong);
+             }
+             if (!follow.empty()) ss.follow = &follow;
++#ifdef STRATA_SAGE_INTEGRATION
++            std::unique_ptr<sage::strata::LogitDump> dump;
++            if (!logits_file.empty()) {
++                dump.reset(new sage::strata::LogitDump(logits_file, engine.n_vocab(), ids, follow));
++                ss.logit_dump = dump.get();
++            }
++#endif
+             rc = once(ss, ids, pictures, image_pad, max_new, s, top_probs);
++#ifdef STRATA_SAGE_INTEGRATION
++            if (dump) dump->finish();
++#endif
+         }
+         engine.save_profile();
+         return rc;
