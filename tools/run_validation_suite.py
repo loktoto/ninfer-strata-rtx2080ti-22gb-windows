@@ -120,7 +120,7 @@ def main(argv=None):
         output.mkdir(parents=True)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
         p.error(str(exc))
-    report = {"schema_version": 1, "status": "dry_run" if args.dry_run else "running", "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "fixture_manifest": validation.fingerprint(args.manifest), "capture_argv": capture, "stages": planned, "warmups": args.warmups, "repeats": args.repeats, "gates": {f"G{i}": "not_established" for i in range(1, 8)}, "mtp": "not_tested", "dynamic_graphs": "not_tested", "api": {"status": "not_run", "config": api}}
+    report = {"schema_version": 1, "status": "dry_run" if args.dry_run else "running", "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(), "fixture_manifest": validation.fingerprint(args.manifest), "capture_argv": capture, "stages": planned, "warmups": args.warmups, "repeats": args.repeats, "profile": "strata_ninfer", "gates": {f"G{i}": "deferred" if i in (5, 6) else "not_established" for i in range(1, 8)}, "mtp": "not_tested", "dynamic_graphs": "not_tested", "api": {"status": "not_run", "config": api}}
     def save():
         (output / "suite.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     save()
@@ -195,7 +195,7 @@ def main(argv=None):
         report["status"] = "failed"
         report["error"] = str(exc)
     save()
-    print(f"{report['status']}: {output / 'suite.json'}; G1-G7 not established")
+    print(f"{report['status']}: {output / 'suite.json'}; active gates G1-G4/G7 not established; unlock G5/G6 deferred")
     return 1 if report["status"] == "failed" else 0
 
 

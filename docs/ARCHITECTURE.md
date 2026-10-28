@@ -19,7 +19,9 @@ events created or polled by this library. Its tests validate host state transiti
 not CUDA race freedom. Future integration must translate actual CUDA event
 completion into these transitions and retain live graph references before eviction.
 
-The unlock repository is pinned research input, not a runtime library. It currently
+Current scope is Strata + NInfer on normal SM75; Turing Unlock is deferred by
+the owner and is not a release dependency. The unlock repository is preserved
+as pinned research input, not a runtime library. It currently
 implements host parsers and simulated lifecycle contracts. No Windows EFI unlocker
 or measured post-driver speed change is available. Nothing here writes firmware,
 changes TDR, changes boot configuration or assumes the GPU is unlocked. Its
@@ -63,8 +65,10 @@ residency matters even when a roughly 20.2 GiB GGUF resembles a 22GB VRAM budget
    copies, eviction, graph pointer updates and allocation failure on the real GPU.
 5. Qualify each context size for full prompt consumption, retrieval and document
    quality. Enable MTP only after inspecting GGUF draft tensors and baseline parity.
-6. Implement/validate the Windows boot unlock separately; run matched MMA and
-   whole-model A/B tests after driver takeover before using unlock in tuning.
+6. Qualify the API, MTP, endurance and portable Windows package on normal SM75.
+   Compare complete inference cost, including CPU misses and transfers, before
+   selecting candidate kernels. Windows unlock and unlock-aware tuning remain
+   deferred future work.
 
 All hardware gates currently remain not run. Hosted Windows compilation and host
 unit tests cannot promote those gates.

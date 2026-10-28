@@ -1,5 +1,9 @@
 # TU102 Windows unlock and SM75 research
 
+Current owner decision: **Turing Unlock and unlock-aware tuning are deferred.**
+This document preserves research for a future phase. Current release acceptance
+is Strata + NInfer on normal SM75; see [ROADMAP.md](ROADMAP.md).
+
 Research snapshot: 2026-10-28. **There is no demonstrated Windows unlock in the supplied projects.** The Linux project reports its own results on a Dell RTX 2080 Ti 22GB (`10de:1e07`) with driver 575.51.03; these are upstream claims, not reproduced here, and not evidence that the Windows driver retains the effect. Real Windows compilation, kernel execution, inference, boot unlock and post-driver MMA remain unverified. Source, binaries, machine, driver and full model must be bound to each run.
 
 ## What can be reused
@@ -25,7 +29,7 @@ Windows WDDM's [TDR overview](https://learn.microsoft.com/en-us/windows-hardware
 
 ## Evidence validator
 
-`python tools/check_acceptance.py manifest.json` checks local files and prints JSON. Gate statuses use `not_run`, `failed`, or submitted `passed`; all seven must be present. An all-not-run manifest needs only `schema_version: 1` and `gates` with objects such as `{"status":"not_run"}`. `config/unlock-capabilities.json` records current capability status separately, not a completed evidence manifest.
+`python tools/check_acceptance.py manifest.json` checks local files and prints JSON. Current-scope manifests use `schema_version: 2`, `profile: "strata_ninfer"`, and all seven gate keys: G5/G6 must be `{"status":"deferred"}`; G1–G4/G7 use `not_run`, `failed`, or submitted `passed`. This scope never requires matched unlocked MMA evidence. Legacy `schema_version: 1` manifests retain the original all-seven-gate contract described below; they cannot select a different profile. Gate statuses in that legacy contract use `not_run`, `failed`, or submitted `passed`; all seven must be present. An all-not-run manifest needs only `schema_version: 1` and `gates` with objects such as `{"status":"not_run"}`. `config/unlock-capabilities.json` records current capability status separately, not a completed evidence manifest.
 
 For any submitted pass, add `inventory` with `os: "Windows 11"`, `native: true`, `gpu: "TU102"`, `compute_capability: "7.5"`, integer `vram_bytes` (21–23 GiB), and `raw`; `source` with the full 40-hex project `commit`, separate full 40-hex `strata_commit` matching `strata.commit` in its `lock`, and a nonempty `patches` list of hashed integration patch artifacts; `binary`, `model`, and `build_record`. Each artifact is `{"path":"relative-or-absolute-path", "sha256":"lowercase-64-hex"}` and is read and hashed; model must match this repository's published model lock. Each submitted passed gate needs `environment: "native_windows_hardware"`, matching `binary_sha256` and `model_sha256`, and a nonempty `artifacts` array. G5/G6 also need a hashed `post_driver_mma.benchmark` artifact and `post_driver_mma.locked` and `.unlocked` runs. Each run must specify the hardware environment, the benchmark artifact's SHA as `binary_sha256`, matching nonempty `device_id`, `driver_version`, `test_id`, `shape` and `dtype`, and separate hashed `raw_result` artifacts. The benchmark can be a different executable from the inference engine and a pure MMA test needs no model. G6's end-to-end gate record still requires the inference binary and model hashes. Use actual full files; relative paths resolve against the manifest directory.
 

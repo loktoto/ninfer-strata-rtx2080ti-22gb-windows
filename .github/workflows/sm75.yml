@@ -1,6 +1,12 @@
 name: Windows SM75 build and kernel parity
 on:
   workflow_dispatch:
+    inputs:
+      run_mma_probe:
+        description: 'Optional normal-SM75 MMA diagnostic; does not qualify unlock'
+        required: false
+        type: boolean
+        default: false
 jobs:
   sm75:
     runs-on: [self-hosted, Windows, X64, sm75]
@@ -25,7 +31,7 @@ jobs:
         shell: powershell
         run: .\tools\build_windows.ps1
       - name: Build numerical and host tests
-        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity sage_mma_probe slot_pool_test strata_policy_test strata_expert_q4k_test q4k_oracle_test token_file_test logit_dump_test dispatch_trace_test strata_expert_q6k_test q6k_oracle_test --parallel 2
+        run: cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity slot_pool_test strata_policy_test strata_expert_q4k_test q4k_oracle_test token_file_test logit_dump_test dispatch_trace_test strata_expert_q6k_test q6k_oracle_test --parallel 2
       - name: Run independent kernel oracle
         run: |
           & .\build-windows\kernels\sage_rmsnorm_parity.exe 2>&1 | Tee-Object evidence/hardware-run/rmsnorm.txt
@@ -38,8 +44,11 @@ jobs:
         run: |
           & .\build-windows\kernels\sage_q6k_slots_parity.exe 2>&1 | Tee-Object evidence/hardware-run/q6k.txt
           if ($LASTEXITCODE -ne 0) { throw 'Q6_K numerical validation failed' }
-      - name: Probe native FP16 MMA without asserting unlock state
+      - name: Optional normal-SM75 MMA diagnostic
+        if: ${{ inputs.run_mma_probe }}
         run: |
+          cmake --build build-windows --target sage_mma_probe --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'FP16 MMA diagnostic build failed' }
           & .\build-windows\kernels\sage_mma_probe.exe 2>&1 | Tee-Object evidence/hardware-run/mma.txt
           if ($LASTEXITCODE -ne 0) { throw 'FP16 MMA validation failed' }
       - name: Run host scheduler contracts
@@ -51,7 +60,7 @@ jobs:
         run: |
           $Records = @('build-windows/strata/strata-poly.exe', 'build-windows/kernels/sage_rmsnorm_parity.exe', 'build-windows/kernels/sage_q4k_slots_parity.exe', 'build-windows/kernels/sage_mma_probe.exe', 'build-windows/kernels/sage_q6k_slots_parity.exe') | Where-Object { Test-Path $_ } | ForEach-Object { Get-FileHash $_ -Algorithm SHA256 | Select-Object Path,Hash }
           New-Item -ItemType Directory -Force evidence/hardware-run | Out-Null
-          @{source_commit=$env:GITHUB_SHA; scope='kernel tests only; model and unlock gates unestablished'; binaries=@($Records)} | ConvertTo-Json -Depth 4 | Set-Content evidence/hardware-run/binaries.json
+          @{source_commit=$env:GITHUB_SHA; profile='strata_ninfer'; scope='kernel tests only; active model gates unestablished; G5/G6 deferred'; binaries=@($Records)} | ConvertTo-Json -Depth 4 | Set-Content evidence/hardware-run/binaries.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

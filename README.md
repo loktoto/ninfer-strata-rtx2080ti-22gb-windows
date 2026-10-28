@@ -4,7 +4,11 @@ One Strata-owned runtime for Sage-A1.5 Q4_K_M on Windows 11 x64 and the
 RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
 **Development implementation; hardware acceptance is pending.** This repository
-does not yet provide a qualified Windows executable or a verified Windows GPU unlock. No throughput or 256K-context success is claimed.
+does not yet provide a qualified Windows executable. No throughput or 256K-context success is claimed.
+
+**Current scope: Strata + NInfer on normal SM75. Turing Unlock is deferred**
+by the project owner; it is not a dependency of this release. Preserve its
+research for a later phase. See the [active roadmap](docs/ROADMAP.md).
 
 ## What is implemented
 
@@ -22,7 +26,7 @@ does not yet provide a qualified Windows executable or a verified Windows GPU un
 - An official Sage model lock and bounded GGUF tensor inventory tool.
 - Windows hardware inventory capture and host test CI for Windows/Linux.
 
-The unlock repository is tracked as research only. Its current host parser tests
+The unlock repository is retained as deferred research only. Its current host parser tests
 are not hardware unlock evidence. See [architecture and gates](docs/ARCHITECTURE.md).
 
 ## Host development checks
@@ -58,9 +62,10 @@ The build links one inference engine; it does not launch a second NInfer engine.
 Build and run the separate numerical kernel check on the SM75 machine:
 
 ```powershell
-cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity --parallel 2
+cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity --parallel 2
 .\build-windows\kernels\sage_rmsnorm_parity.exe
 .\build-windows\kernels\sage_q4k_slots_parity.exe
+.\build-windows\kernels\sage_q6k_slots_parity.exe
 ```
 
 Then follow the [strict launch instructions](integration/strata/README.md).
@@ -119,8 +124,9 @@ passed. It hashes full files, so allow time for the model read.
 Retain original routing and all selected experts; retain the GGUF's mixed tensor
 formats. “No expert skipping” does not mean Q4 quantization is lossless. Adapt
 NInfer operations at borrowed-buffer boundaries, not through its separately owning
-Engine or incompatible packed Q4 loader. GPU unlock and long-context performance
-remain evidence-dependent workstreams, not launch-time assumptions.
+Engine or incompatible packed Q4 loader. Long-context performance requires target evidence. GPU unlock research and
+unlocked autotuning are deferred; current integration and performance testing
+use the normal SM75 path.
 
 Source attribution and license boundaries are documented in [NOTICE](NOTICE).
 The local checks and unverified gates are recorded in [validation](docs/VALIDATION.md).
@@ -130,7 +136,8 @@ for the patched SM75 runtime, including both linked candidate operations.
 Current [testing readiness and blockers](docs/TEST_READINESS.md),
 [Terra research](docs/RESEARCH_FINDINGS.md), [full-logit validation](docs/LOGIT_VALIDATION.md)
 and [staged testing procedure](docs/TESTING.md) describe the next target-machine
-work. Hardware acceptance, Windows unlock and a qualified release remain pending.
+work. Hardware acceptance and a qualified Strata + NInfer release remain pending.
+Windows unlock is outside the current release scope.
 
 The [Q6_K donor integration](docs/Q6K_DONOR.md) is selected with
 `--ninfer-expert-q6k` in strict/API launchers. Validation accepts
