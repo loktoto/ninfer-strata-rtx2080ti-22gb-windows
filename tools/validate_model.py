@@ -28,7 +28,7 @@ _compare_spec = importlib.util.spec_from_file_location("full_logits_comparator",
 _comparator = importlib.util.module_from_spec(_compare_spec)
 _compare_spec.loader.exec_module(_comparator)
 ENV_KEYS = ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS",
-            "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K")
+            "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_TRACE")
 INT32_MAX = 2 ** 31 - 1
 STATS = re.compile(
     r"^prompt (\d+) tokens (\S+) tok/s, generated (\d+) tokens "
@@ -97,6 +97,7 @@ def model_inventory(model, lock_path, hash_model):
 def parse_logs(stdout_path, stderr_path, prompt_count, follow, top_count):
     """Parse the one-shot CSV/std-error protocol in PolyStrata main.cpp::once."""
     errors, ids, output_lines, stats, top_rows = [], [], 0, [], []
+    dispatched = set()
     dump_count = 0
     dump_hash = hashlib.sha256()
     with stdout_path.open("r", encoding="utf-8", errors="replace") as stream:
@@ -114,6 +115,8 @@ def parse_logs(stdout_path, stderr_path, prompt_count, follow, top_count):
     with stderr_path.open("r", encoding="utf-8", errors="replace") as stream:
         for line in stream:
             line = line.rstrip("\r\n")
+            if line in {"sage-dispatch: rmsnorm", "sage-dispatch: expert-q4k"}:
+                dispatched.add(line.split(": ", 1)[1])
             match = STATS.match(line)
             if match:
                 stats.append({"prompt_tokens": int(match[1]), "generated_tokens": int(match[3]),
@@ -161,7 +164,7 @@ def parse_logs(stdout_path, stderr_path, prompt_count, follow, top_count):
     return {"generated_ids": ids, "forced_continuation_matches": ids == follow,
             "stats": stats, "top_probabilities": top_rows, "layer_checksum_lines": dump_count,
             "layer_checksums_sha256": dump_hash.hexdigest() if dump_count else None,
-            "errors": sorted(set(errors))}
+            "errors": sorted(set(errors)), "dispatch_enqueues": sorted(dispatched)}
 
 
 def run_one(command, env, output, name, timeout, prompt_count, follow, top_count):
@@ -218,6 +221,7 @@ def main(argv=None):
     parser.add_argument("--timeout", type=float, default=3600, help="Seconds per engine run")
     parser.add_argument("--hash-model", action="store_true", help="Read and verify the entire GGUF once")
     parser.add_argument("--dry-run", action="store_true", help="Write launch inventory without running; allowed on Linux")
+    parser.add_argument("--require-dispatch", action="store_true", help="Fail if selected candidate paths never report a host enqueue")
     parser.add_argument("--full-logits", action="store_true", help="Capture and compare every teacher-forced FP32 logit")
     parser.add_argument("--logits-atol", type=float, default=1e-4)
     parser.add_argument("--logits-rtol", type=float, default=1e-3)
@@ -252,6 +256,7 @@ def main(argv=None):
                                      args.candidate in {"expert-q4k", "both"})]:
             command, env = _launcher.launch_spec(args.engine, args.model, common + (["--logits-file", str(output / f"{name}.logits")] if args.full_logits else []),
                                                 ninfer_rmsnorm=rmsnorm, ninfer_expert_q4k=q4k)
+            env["STRATA_SAGE_TRACE"] = "1" if args.require_dispatch else "0"
             controlled = {key: env[key] for key in ENV_KEYS}
             launches[name] = {"argv": command, "controlled_environment": controlled,
                               "controlled_environment_sha256": hashlib.sha256(
@@ -299,6 +304,13 @@ def main(argv=None):
                 comparison["error"] = str(exc)
             report["comparison"]["full_logits"] = comparison
             if comparison["status"] == "failed":
+                report["status"] = "failed"
+        if args.require_dispatch:
+            required = {"rmsnorm", "expert-q4k"} if args.candidate == "both" else {args.candidate}
+            observed = set(report["runs"]["candidate"]["diagnostics"]["dispatch_enqueues"])
+            report["comparison"]["dispatch_missing"] = sorted(required - observed)
+            report["comparison"]["dispatch_scope"] = "Host enqueue only, not GPU execution or completion"
+            if required - observed:
                 report["status"] = "failed"
         write_report(output, report)
     print(f"{report['status']}: {output / 'report.json'}; G1/G2 not established")

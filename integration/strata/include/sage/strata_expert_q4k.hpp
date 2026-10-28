@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sage/cuda/q4k_slots.hpp"
+#include "sage/dispatch_trace.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +22,8 @@ inline bool try_expert_q4k_slots(int ggml_type, const Slots& slots, int count,
         borrowed.x[i] = slots.x[i];
         borrowed.y[i] = slots.y[i];
     }
-    return sage::cuda::try_q4k_slots_q8_1(borrowed, count, n_in, n_out, stream);
+    if (!sage::cuda::try_q4k_slots_q8_1(borrowed, count, n_in, n_out, stream)) return false;
+    trace_dispatch(DispatchTrace::expert_q4k);
+    return true;
 }
 } // namespace sage::strata

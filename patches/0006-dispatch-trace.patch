@@ -1,0 +1,24 @@
+diff --git a/src/poly/kernels.cu b/src/poly/kernels.cu
+index aef8a3c..e84b247 100644
+--- a/src/poly/kernels.cu
++++ b/src/poly/kernels.cu
+@@ -3,6 +3,7 @@
+ #include "strata/poly/kernels.hpp"
+ #ifdef STRATA_SAGE_INTEGRATION
+ #include "sage/cuda/rms_norm.hpp"
++#include "sage/dispatch_trace.hpp"
+ #endif
+ #ifdef STRATA_POLY_GDN_MMA
+ #include "gdn_mma.hpp"
+@@ -2520,8 +2521,10 @@ void rms_norm(const float* x, const float* w, float* y, int n, int rows, float e
+     // first candidate covers Sage's 2048-wide main norms, using caller memory.
+     const char* backend = std::getenv("STRATA_SAGE_RMSNORM");
+     if (backend && std::string(backend) == "1" && n == 2048 && x != y && w != y &&
+-        sage::cuda::try_rms_norm_f32(x, w, y, n, rows, eps, stream, y_stride ? y_stride : n))
++        sage::cuda::try_rms_norm_f32(x, w, y, n, rows, eps, stream, y_stride ? y_stride : n)) {
++        sage::strata::trace_dispatch(sage::strata::DispatchTrace::rmsnorm);
+         return;
++    }
+ #endif
+     rms_norm_kernel<<<rows, sum_threads(n), 0, cs(stream)>>>(x, w, y, n, eps, y_stride ? y_stride : n);
+     if (const cudaError_t e = cudaGetLastError(); e != cudaSuccess)

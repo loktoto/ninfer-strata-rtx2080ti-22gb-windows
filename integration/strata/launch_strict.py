@@ -28,7 +28,7 @@ def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None,
     if not model.is_file():
         raise ValueError(f"Model file does not exist: {model}")
     env = dict(os.environ if environ is None else environ)
-    env.update(STRATA_ROUTE_TAIL_SKIP="0", STRATA_FREEZE_EXPERTS="1",
+    env.update(STRATA_ROUTE_TAIL_SKIP="0", STRATA_FREEZE_EXPERTS="1", STRATA_SAGE_TRACE="0",
                STRATA_SAGE_RMSNORM="1" if ninfer_rmsnorm else "0",
                STRATA_SAGE_EXPERT_Q4K="1" if ninfer_expert_q4k else "0")
     return [str(engine), "--model", str(model), *DEFAULTS, *extra], env
