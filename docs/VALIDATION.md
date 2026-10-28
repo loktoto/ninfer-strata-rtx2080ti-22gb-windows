@@ -5,8 +5,8 @@ This is an initial source implementation, not a passed P1 or release milestone.
 | Check | Observed result |
 | --- | --- |
 | Linux GCC 14.2 / CMake 4.4.4 Release host build | Passed |
-| Host CTest suites including logit writer and dispatch traces | 7/7 passed |
-| Python inspector, launch, API, full-logit, suite and evidence contracts | 72/72 passed |
+| Host CTest suites including logit writer and dispatch traces | 9/9 passed |
+| Python inspector, launch, API, full-logit, suite and evidence contracts | 83/83 passed |
 | Slot policy strict compiler warnings | Passed |
 | Slot policy ASan + UBSan | Passed |
 | Patch against locked PolyStrata commit | Applied successfully |
@@ -66,3 +66,9 @@ No new hardware gate is established by these checks.
 Next hardware step: native Windows build, kernel oracle, short-prompt same-GGUF
 reference comparison, then a real 32768-token prompt with output allowance. Do
 not interpret compilation or successful model loading as passing that sequence.
+
+The seventh integration patch adds a NInfer-all-derived Q6_K path. Its CUDA
+kernel, GPU oracle executable and full runtime compiled/linked for SM75; symbol
+inspection confirmed its enqueue function. CPU oracle and adapter checks passed,
+but GPU numerical parity remains unverified. Windows DLL packaging has mocked
+dependency-closure tests only; native package execution is unverified.
