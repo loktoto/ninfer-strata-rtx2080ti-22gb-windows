@@ -31,3 +31,14 @@ unlock remain unfinished; no source milestone promotes those gates.
 
 Concurrent privacy-guard commit `3a09615` was preserved by merge `ed06faa`.
 See TEST_READINESS.md for unimplemented or hardware-blocked acceptance work.
+
+2026-10-28 donor reuse and Windows testing preparation:
+
+| Commit | Delivered | Evidence |
+| --- | --- | --- |
+| `3bded86` | NInfer-all Q6_K decoder adapted to borrowed Strata expert slots; independent opt-in and enqueue trace | Complete Linux SM75 runtime and Q6_K oracle compiled/linked; CPU fixture and adapter tests pass; GPU parity unrun |
+| `d14d2e6` | Windows development ZIP packaging informed by mr-september's release, with recursive DLL imports and provenance manifest | Nine C++ suites / 83 Python tests pass; real Windows package and driver-only launch pending |
+
+[DONOR_REVIEW.md](DONOR_REVIEW.md) records the exact donor revisions, upstream
+release claims and model/format boundaries. No benchmark from another model
+is treated as Sage evidence.
