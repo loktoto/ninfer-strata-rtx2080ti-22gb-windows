@@ -124,3 +124,8 @@ Source attribution and license boundaries are documented in [NOTICE](NOTICE).
 The local checks and unverified gates are recorded in [validation](docs/VALIDATION.md).
 The [complete Linux development build](docs/FULL_RUNTIME_BUILD.md) also passed
 for the patched SM75 runtime, including both linked candidate operations.
+
+Current [testing readiness and blockers](docs/TEST_READINESS.md),
+[Terra research](docs/RESEARCH_FINDINGS.md), [full-logit validation](docs/LOGIT_VALIDATION.md)
+and [staged testing procedure](docs/TESTING.md) describe the next target-machine
+work. Hardware acceptance, Windows unlock and a qualified release remain pending.

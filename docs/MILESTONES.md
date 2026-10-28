@@ -17,3 +17,17 @@ was dispatched and remains queued at the last observation.
 
 GPU execution remains required to pass G2. Live event-backed scheduler integration and Windows boot
 unlock remain unfinished; no source milestone promotes those gates.
+
+2026-10-28 Terra research and testing milestones:
+
+| Commit | Delivered | Evidence |
+| --- | --- | --- |
+| `72c2c5d` | Repeatable overlapping patch series | Partial/complete reruns, CRLF and divergent edit tests |
+| `0c59b84` | Complete teacher-forced FP32 logit capture/comparison | Writer and comparator tests; full runtime rebuilt |
+| `fff3aa5` | Opt-in live cache ownership audit | Source ordering review; full runtime compiled; GPU stress pending |
+| `2dd2a8a` | Researched stage runner and acceptance evidence review | Host tests; no synthetic hardware approval |
+| `ea87bd9` | Optional candidate enqueue evidence | Fallback/no-enqueue and once-only trace tests; runtime rebuilt |
+| `8299f89` | Native SM75 FP16 MMA probe | Compiles/links; no GPU execution |
+
+Concurrent privacy-guard commit `3a09615` was preserved by merge `ed06faa`.
+See TEST_READINESS.md for unimplemented or hardware-blocked acceptance work.
