@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Supply a separate fixture manifest with independently prepared exact token IDs and externally reviewed task expectations.",
+  "stages": [
+    {"name": "short", "total_tokens": null},
+    {"name": "32k", "total_tokens": 32768},
+    {"name": "64k", "total_tokens": 65536},
+    {"name": "128k", "total_tokens": 131072},
+    {"name": "256k", "total_tokens": 262144}
+  ]
+}

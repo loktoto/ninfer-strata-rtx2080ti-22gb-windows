@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "target": {"os": "Windows 11", "architecture": "SM75", "gpu": "TU102", "vram_min_bytes": 22548578304, "vram_max_bytes": 24696061952},
+  "capabilities": {"windows_host_synthetic": "implemented", "uefi_read_only_inspector": "not_implemented", "no_unlock_boot_handoff": "not_implemented", "windows_tu102_unlock": "not_implemented", "post_driver_mma_qualification": "not_run"},
+  "gates": {"G1": "not_run", "G2": "not_run", "G3": "not_run", "G4": "not_run", "G5": "not_run", "G6": "not_run", "G7": "not_run"},
+  "interpretation": "Source and synthetic results do not establish hardware unlock; gate evidence is subject to independent review."
+}
