@@ -49,3 +49,17 @@ Neither establishes full-logit numerical parity or passes G1/G2. Diagnostic
 dumping also changes timing, so this tool cannot establish throughput speedup.
 Use independent GPU operator oracles and same-GGUF full-logit comparison for
 numerical acceptance, plus a separate non-diagnostic benchmark for performance.
+
+For complete-value comparison, add `--full-logits --logits-atol 0.0001
+--logits-rtol 0.001`. These are explicit starting test tolerances, not established
+Sage quality thresholds. Malformed, missing or mismatching dumps fail the run.
+See LOGIT_VALIDATION.md for the format and independent comparator. G1/G2 still
+require target hardware and operator/reference validation; matching one supplied
+continuation is partial numerical evidence only.
+
+Add `--require-dispatch` to require enqueue traces for every selected candidate.
+Unsupported Q4_K paths, including all-cached device-ID dispatch, may legitimately
+retain native kernels; choose a workload that actually exercises the cached
+host-routed candidate when qualifying it. Traces mean host enqueue, potentially
+during graph capture, not device execution or correctness. Strict runs override
+inherited tracing settings for reproducibility.

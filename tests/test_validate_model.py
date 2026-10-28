@@ -318,6 +318,23 @@ class ModelValidationTests(unittest.TestCase):
             self.assertEqual(self.call(["--full-logits"]), 1)
         self.assertIn("error", self.report()["comparison"]["full_logits"])
 
+    def test_require_dispatch_rejects_unused_candidates(self):
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=self.fake_run):
+            self.assertEqual(self.call(["--require-dispatch"]), 1)
+        self.assertEqual(self.report()["comparison"]["dispatch_missing"], ["expert-q4k", "rmsnorm"])
+
+    def test_require_dispatch_records_successful_host_enqueues(self):
+        def run(command, **kwargs):
+            result = self.fake_run(command, **kwargs)
+            if kwargs["env"]["STRATA_SAGE_RMSNORM"] == "1":
+                kwargs["stderr"].write(b"sage-dispatch: rmsnorm\nsage-dispatch: expert-q4k\n")
+            return result
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=run):
+            self.assertEqual(self.call(["--require-dispatch"]), 0)
+        self.assertEqual(self.report()["comparison"]["dispatch_missing"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
