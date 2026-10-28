@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "status": "deferred_by_owner",
+  "used_by_build_or_startup": false,
+  "unlock_research": {
+    "url": "https://github.com/loktoto/Turing-unlock-windows.git",
+    "commit": "f4ecb58dcf0d57673fc86d6ac6a88e69db57d922",
+    "linked_into_runtime": false,
+    "hardware_unlock_verified": false
+  }
+}

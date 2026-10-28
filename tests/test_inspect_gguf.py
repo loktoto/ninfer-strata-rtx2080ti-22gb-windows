@@ -80,6 +80,16 @@ class InspectGGUFTests(unittest.TestCase):
                              text=True, capture_output=True, check=True)
         self.assertEqual(json.loads(run.stdout)["tensor_types"], report["tensor_types"])
 
+    def test_iq4_xs_recipe_is_distinct_from_tensor_type(self):
+        data = fixture([
+            metadata("general.architecture", 8, string("qwen35moe")),
+            metadata("general.file_type", 4, number("I", 30)),
+        ], [tensor("blk.0.ffn_gate_exps.weight", [2048, 512, 256], 23, 0)])
+        report = self.inspect(data)
+        self.assertEqual(report["file_type_name"], "IQ4_XS")
+        self.assertEqual(report["tensor_types"], {"IQ4_XS": 1})
+        self.assertEqual(report["representative_tensors"]["IQ4_XS"][0]["type_id"], 23)
+
     def test_all_scalar_types_and_nested_arrays(self):
         entries = [metadata("general.architecture", 8, string("test"))]
         scalar_values = [(0, "B", 255), (1, "b", -1), (2, "H", 65535),

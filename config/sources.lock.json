@@ -9,12 +9,6 @@
     "url": "https://github.com/loktoto/ninfer-2080ti-22g-windows.git",
     "commit": "de849e1f131a8c615ae2943d2922d217c488fb0e"
   },
-  "unlock_research": {
-    "url": "https://github.com/loktoto/Turing-unlock-windows.git",
-    "commit": "f4ecb58dcf0d57673fc86d6ac6a88e69db57d922",
-    "linked_into_runtime": false,
-    "hardware_unlock_verified": false
-  },
   "ninfer_all_kernel_origin": {
     "url": "https://github.com/iamwavecut/ninfer-all.git",
     "commit": "71d3f8190772ef7089f8eda4e22371114fd5bbf9",
