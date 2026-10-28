@@ -63,3 +63,8 @@ retain native kernels; choose a workload that actually exercises the cached
 host-routed candidate when qualifying it. Traces mean host enqueue, potentially
 during graph capture, not device execution or correctness. Strict runs override
 inherited tracing settings for reproducibility.
+
+Use `--candidate expert-q6k` for the NInfer-all-derived Q6_K candidate, or
+`--candidate all` for RMSNorm/Q4_K/Q6_K together. `both` retains RMSNorm/Q4_K.
+Baseline explicitly disables all three, including inherited Q6_K settings.
+GPU numerical acceptance remains pending.

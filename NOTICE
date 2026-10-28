@@ -14,3 +14,8 @@ input. Its source is not included in or linked into this inference runtime.
 
 Sage-A1.5 model weights are separate artifacts. Their publisher's model license
 and notices apply; no model weights are redistributed in this repository.
+
+The GGUF Q6_K byte decoder is adapted from iamwavecut/ninfer-all,
+commit 71d3f8190772ef7089f8eda4e22371114fd5bbf9, under Apache-2.0.
+Its block layout follows ggml Q6_K; source and numerical details are recorded
+in docs/Q6K_DONOR.md.

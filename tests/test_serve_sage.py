@@ -97,7 +97,7 @@ class ServeSageTests(unittest.TestCase):
         self.assertEqual(cfg["port"], 8080)
         self.assertEqual(cfg["model_name"], "sage-a1.5")
         self.assertEqual(cfg["env"], {"STRATA_ROUTE_TAIL_SKIP": "0", "STRATA_FREEZE_EXPERTS": "1",
-                                      "STRATA_SAGE_RMSNORM": "0", "STRATA_SAGE_EXPERT_Q4K": "0"})
+                                      "STRATA_SAGE_RMSNORM": "0", "STRATA_SAGE_EXPERT_Q4K": "0", "STRATA_SAGE_EXPERT_Q6K": "0"})
         for _, kwargs in self.calls[1:]:
             for key, value in cfg["env"].items():
                 self.assertEqual(kwargs["env"][key], value)
@@ -108,6 +108,12 @@ class ServeSageTests(unittest.TestCase):
         self.assertEqual(self.config()["env"]["STRATA_SAGE_RMSNORM"], "1")
         self.assertEqual(self.config()["env"]["STRATA_SAGE_EXPERT_Q4K"], "0")
         self.assertEqual(self.config()["model_name"], "sage-candidate")
+
+    def test_q6k_opt_in(self):
+        code, _ = self.invoke("--ninfer-expert-q6k")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.config()["env"]["STRATA_SAGE_EXPERT_Q6K"], "1")
+        self.assertEqual(self.config()["env"]["STRATA_SAGE_EXPERT_Q4K"], "0")
 
     def test_q4k_opt_in(self):
         self.invoke("--ninfer-expert-q4k")

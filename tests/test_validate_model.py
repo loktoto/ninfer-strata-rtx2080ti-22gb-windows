@@ -335,6 +335,24 @@ class ModelValidationTests(unittest.TestCase):
             self.assertEqual(self.call(["--require-dispatch"]), 0)
         self.assertEqual(self.report()["comparison"]["dispatch_missing"], [])
 
+    def test_all_candidate_plan_includes_q6k_and_baseline_remains_original(self):
+        self.assertEqual(self.call(["--dry-run", "--candidate", "all"]), 0)
+        launches = self.report()["launches"]
+        for key in ("STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_EXPERT_Q6K"):
+            self.assertEqual(launches["baseline"]["controlled_environment"][key], "0")
+            self.assertEqual(launches["candidate"]["controlled_environment"][key], "1")
+
+    def test_q6k_dispatch_evidence_is_recognized(self):
+        def run(command, **kwargs):
+            result = self.fake_run(command, **kwargs)
+            if kwargs["env"]["STRATA_SAGE_EXPERT_Q6K"] == "1":
+                kwargs["stderr"].write(b"sage-dispatch: expert-q6k\n")
+            return result
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=run):
+            self.assertEqual(self.call(["--candidate", "expert-q6k", "--require-dispatch"]), 0)
+        self.assertEqual(self.report()["comparison"]["dispatch_missing"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

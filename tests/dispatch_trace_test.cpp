@@ -49,10 +49,12 @@ int main() {
     if (std::ftell(output) != 0) return 4; // rejected adapter calls did not trace
     accept = true;
     if (!sage::strata::try_expert_q4k_slots(12, slots, 1, 256, 1, nullptr)) return 5;
+    sage::strata::trace_dispatch(sage::strata::DispatchTrace::expert_q6k);
     std::vector<std::thread> threads;
     for (int i = 0; i < 16; ++i) threads.emplace_back([] {
         sage::strata::trace_dispatch(sage::strata::DispatchTrace::rmsnorm);
         sage::strata::trace_dispatch(sage::strata::DispatchTrace::expert_q4k);
+        sage::strata::trace_dispatch(sage::strata::DispatchTrace::expert_q6k);
     });
     for (auto& t : threads) t.join();
     std::fflush(stderr);
@@ -64,5 +66,5 @@ int main() {
     std::fclose(output);
     env("STRATA_SAGE_TRACE", nullptr);
     env("STRATA_SAGE_EXPERT_Q4K", nullptr);
-    return std::string(buffer, n) == "sage-dispatch: expert-q4k\nsage-dispatch: rmsnorm\n" ? 0 : 6;
+    return std::string(buffer, n) == "sage-dispatch: expert-q4k\nsage-dispatch: expert-q6k\nsage-dispatch: rmsnorm\n" ? 0 : 6;
 }

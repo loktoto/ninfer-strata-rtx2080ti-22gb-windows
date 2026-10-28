@@ -8,15 +8,17 @@
 namespace sage::strata {
 // Reports a host dispatch enqueue, including enqueue during graph capture. It
 // does not report device execution, completion, or numerical correctness.
-enum class DispatchTrace { rmsnorm, expert_q4k };
+enum class DispatchTrace { rmsnorm, expert_q4k, expert_q6k };
 
 inline void trace_dispatch(DispatchTrace kind) {
     const char* enabled = std::getenv("STRATA_SAGE_TRACE");
     if (!enabled || std::strcmp(enabled, "1") != 0) return;
     static std::atomic_flag rmsnorm = ATOMIC_FLAG_INIT;
     static std::atomic_flag expert_q4k = ATOMIC_FLAG_INIT;
-    std::atomic_flag& once = kind == DispatchTrace::rmsnorm ? rmsnorm : expert_q4k;
+    static std::atomic_flag expert_q6k = ATOMIC_FLAG_INIT;
+    std::atomic_flag& once = kind == DispatchTrace::rmsnorm ? rmsnorm :
+                             kind == DispatchTrace::expert_q4k ? expert_q4k : expert_q6k;
     if (!once.test_and_set(std::memory_order_relaxed))
-        std::fprintf(stderr, "sage-dispatch: %s\n", kind == DispatchTrace::rmsnorm ? "rmsnorm" : "expert-q4k");
+        std::fprintf(stderr, "sage-dispatch: %s\n", kind == DispatchTrace::rmsnorm ? "rmsnorm" : kind == DispatchTrace::expert_q4k ? "expert-q4k" : "expert-q6k");
 }
 } // namespace sage::strata

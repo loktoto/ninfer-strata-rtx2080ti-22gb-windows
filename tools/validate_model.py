@@ -28,7 +28,11 @@ _compare_spec = importlib.util.spec_from_file_location("full_logits_comparator",
 _comparator = importlib.util.module_from_spec(_compare_spec)
 _compare_spec.loader.exec_module(_comparator)
 ENV_KEYS = ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS",
-            "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_TRACE")
+            "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_EXPERT_Q6K", "STRATA_SAGE_TRACE")
+CANDIDATES = {
+    "rmsnorm": {"rmsnorm"}, "expert-q4k": {"expert-q4k"}, "expert-q6k": {"expert-q6k"},
+    "both": {"rmsnorm", "expert-q4k"}, "all": {"rmsnorm", "expert-q4k", "expert-q6k"},
+}
 INT32_MAX = 2 ** 31 - 1
 STATS = re.compile(
     r"^prompt (\d+) tokens (\S+) tok/s, generated (\d+) tokens "
@@ -115,7 +119,7 @@ def parse_logs(stdout_path, stderr_path, prompt_count, follow, top_count):
     with stderr_path.open("r", encoding="utf-8", errors="replace") as stream:
         for line in stream:
             line = line.rstrip("\r\n")
-            if line in {"sage-dispatch: rmsnorm", "sage-dispatch: expert-q4k"}:
+            if line in {"sage-dispatch: rmsnorm", "sage-dispatch: expert-q4k", "sage-dispatch: expert-q6k"}:
                 dispatched.add(line.split(": ", 1)[1])
             match = STATS.match(line)
             if match:
@@ -211,7 +215,7 @@ def main(argv=None):
                         help="JSON object containing exact prompt_ids and follow_ids arrays")
     parser.add_argument("--model-lock", type=Path, default=ROOT / "config/model.lock.json")
     parser.add_argument("--output", type=Path, required=True, help="A new directory for provenance and raw logs")
-    parser.add_argument("--candidate", choices=("rmsnorm", "expert-q4k", "both"), default="both")
+    parser.add_argument("--candidate", choices=tuple(CANDIDATES), default="both")
     parser.add_argument("--max-context", type=int,
                         help="Total prompt + generation capacity; default 32768 + len(follow_ids)")
     parser.add_argument("--max-new", type=int,
@@ -251,11 +255,12 @@ def main(argv=None):
                   "--max-context", str(max_context), "--max-new", str(max_new),
                   "--seed", str(args.seed), "--temperature", "0", "--top-probs", str(args.top_probs), "--dump-layers"]
         launches, environments = {}, {}
-        for name, rmsnorm, q4k in [("baseline", False, False),
-                                    ("candidate", args.candidate in {"rmsnorm", "both"},
-                                     args.candidate in {"expert-q4k", "both"})]:
+        for name in ("baseline", "candidate"):
+            selected = CANDIDATES[args.candidate] if name == "candidate" else set()
             command, env = _launcher.launch_spec(args.engine, args.model, common + (["--logits-file", str(output / f"{name}.logits")] if args.full_logits else []),
-                                                ninfer_rmsnorm=rmsnorm, ninfer_expert_q4k=q4k)
+                                                ninfer_rmsnorm="rmsnorm" in selected,
+                                                ninfer_expert_q4k="expert-q4k" in selected,
+                                                ninfer_expert_q6k="expert-q6k" in selected)
             env["STRATA_SAGE_TRACE"] = "1" if args.require_dispatch else "0"
             controlled = {key: env[key] for key in ENV_KEYS}
             launches[name] = {"argv": command, "controlled_environment": controlled,
@@ -306,7 +311,7 @@ def main(argv=None):
             if comparison["status"] == "failed":
                 report["status"] = "failed"
         if args.require_dispatch:
-            required = {"rmsnorm", "expert-q4k"} if args.candidate == "both" else {args.candidate}
+            required = CANDIDATES[args.candidate]
             observed = set(report["runs"]["candidate"]["diagnostics"]["dispatch_enqueues"])
             report["comparison"]["dispatch_missing"] = sorted(required - observed)
             report["comparison"]["dispatch_scope"] = "Host enqueue only, not GPU execution or completion"

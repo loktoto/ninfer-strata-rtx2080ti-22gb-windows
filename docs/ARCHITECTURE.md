@@ -7,8 +7,9 @@ model, allocator, tokenizer, server or CUDA context. Its first operation is FP32
 RMSNorm, adapted to preserve Strata's activation representation.
 
 This operation is useful for establishing the link/stream/numerical boundary. The Q4_K candidate also reads cached expert-slot pointers directly at the gate/up
-and down projections. Q6_K, device-routed all-cached ID dispatch and unsupported
-calls retain original kernels. Both candidates remain opt-in. GPU parity and
+and down projections. The Q6_K candidate now uses NInfer-all's byte decoder on
+those same pointers. Device-routed all-cached ID dispatch and unsupported calls
+retain original kernels. All candidates remain opt-in. GPU parity and
 whole-model validation are required for G2; no Tensor Core speedup is claimed.
 
 The independent `sage_scheduler` host library provides slot generation and reader
