@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import struct
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -282,6 +283,40 @@ class ModelValidationTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             self.call(["--dry-run"])
         self.assertEqual(marker.read_text(), "existing evidence")
+
+
+    def logits_run(self, command, delta=0.0, **kwargs):
+        result = self.fake_run(command, **kwargs)
+        path = Path(command[command.index("--logits-file") + 1])
+        values = [float(i) / 64 for i in range(128)]
+        if path.name == "candidate.logits":
+            values[0] += delta
+        path.write_bytes(struct.pack("<8sIIII", b"SAGELOG1", 1, 64, 3, 2)
+                         + struct.pack("<5i", 0, 21, 37, 42, 43) + struct.pack("<128f", *values))
+        return result
+
+    def test_full_logits_compare_all_values(self):
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=self.logits_run):
+            self.assertEqual(self.call(["--full-logits"]), 0)
+        compare = self.report()["comparison"]["full_logits"]
+        self.assertEqual(compare["status"], "passed")
+        self.assertEqual(compare["values"], 128)
+        self.assertEqual(self.report()["gates"]["G2"], "not_established")
+
+    def test_full_logits_numeric_failure_is_nonzero(self):
+        def run(command, **kwargs):
+            return self.logits_run(command, delta=1.0, **kwargs)
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=run):
+            self.assertEqual(self.call(["--full-logits"]), 1)
+        self.assertEqual(self.report()["comparison"]["full_logits"]["failed"], 1)
+
+    def test_missing_full_logits_is_failure(self):
+        with patch.object(validator.platform, "system", return_value="Windows"), \
+             patch.object(validator.subprocess, "run", side_effect=self.fake_run):
+            self.assertEqual(self.call(["--full-logits"]), 1)
+        self.assertIn("error", self.report()["comparison"]["full_logits"])
 
 
 if __name__ == "__main__":
