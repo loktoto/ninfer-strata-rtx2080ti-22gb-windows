@@ -55,3 +55,6 @@ The earlier [full-logit comparison](IQ4XS_RMSNORM_INTEGRATION_2026-10-29.md) rem
 On this PC and these small repeated fixtures, the project generated faster than llama.cpp with CUDA graphs disabled, while the existing llama.cpp default graph configuration generated faster. Project prompt processing was faster on this single near-32K retrieval fixture. The candidate RMSNorm's small measured speed differences from Strata native do not establish a speedup, and its failed logit test means it remains unqualified and opt-in. IQ4_XS experts still use Strata's native implementation; no integrated NInfer IQ4_XS expert acceleration or matched MTP4 project benchmark is claimed.
 
 Raw request/response JSON, per-second memory samples, fixtures, scripts, full logits and logs were preserved locally under `D:\\AI\\ninfer-strata-test\\evidence\\iq4xs-20261029`. More prompts, repeated long-context trials, CUDA profiling, exact-token independent reference comparisons, and investigation of the RMSNorm divergence are needed before a performance or quality claim beyond these observations.
+
+
+See [uplift diagnosis](IQ4XS_UPLIFT_DIAGNOSIS_2026-10-29.md) for dispatch coverage, correctness, graph-test limitations and prioritized next measurements.
