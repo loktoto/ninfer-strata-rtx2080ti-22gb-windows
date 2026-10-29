@@ -1,0 +1,119 @@
+{
+  "temperature": 1.0,
+  "interpretation": "Probability diagnostics on teacher-forced stored logits, not a root-cause isolation or sampled-output quality proof.",
+  "steps": [
+    {
+      "kl_baseline_candidate": 0.00010339703298097137,
+      "total_variation": 0.0013389429293774891,
+      "baseline_top1_probability": 0.9920410098129554,
+      "candidate_top1_probability": 0.9907020730593117,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 7.355048001472907e-06,
+      "total_variation": 2.842635812559832e-05,
+      "baseline_top1_probability": 0.9999171317165259,
+      "candidate_top1_probability": 0.9999453081030003,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 2.2960490125100507e-06,
+      "total_variation": 1.0358876010656684e-05,
+      "baseline_top1_probability": 0.9999603487383243,
+      "candidate_top1_probability": 0.9999702669398399,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 4.5094522127432055e-05,
+      "total_variation": 0.00016468478657294522,
+      "baseline_top1_probability": 0.999523303903627,
+      "candidate_top1_probability": 0.9996773736356086,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 6.665432456679593e-07,
+      "total_variation": 4.061798971152349e-06,
+      "baseline_top1_probability": 0.9999811530863888,
+      "candidate_top1_probability": 0.9999851939191062,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 2.013016968906812e-08,
+      "total_variation": 2.9135603693634686e-07,
+      "baseline_top1_probability": 0.9999918691634903,
+      "candidate_top1_probability": 0.999991736067098,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 2.8664770559244127e-06,
+      "total_variation": 1.226826212489164e-05,
+      "baseline_top1_probability": 0.9999140202726338,
+      "candidate_top1_probability": 0.9999042021736619,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 0.00018990838366318716,
+      "total_variation": 0.0011969197667450774,
+      "baseline_top1_probability": 0.9963067167245767,
+      "candidate_top1_probability": 0.9951165289149216,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 3.5262839930931705e-06,
+      "total_variation": 2.0244909404801655e-05,
+      "baseline_top1_probability": 0.9996262566827808,
+      "candidate_top1_probability": 0.9996184107953302,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 4.256120237938133e-08,
+      "total_variation": 1.5442615847383672e-07,
+      "baseline_top1_probability": 0.9999984892710577,
+      "candidate_top1_probability": 0.9999984904519456,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 2.2935719400669645e-06,
+      "total_variation": 8.221742714044712e-06,
+      "baseline_top1_probability": 0.9999750613009504,
+      "candidate_top1_probability": 0.9999831257504972,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 0.01601239828641108,
+      "total_variation": 0.0774471810050596,
+      "baseline_top1_probability": 0.6401431694806684,
+      "candidate_top1_probability": 0.7157898565463207,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 0.00014710991812959297,
+      "total_variation": 0.0006668057153793803,
+      "baseline_top1_probability": 0.9980086003323122,
+      "candidate_top1_probability": 0.9986753515549409,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 2.1411090185284705e-05,
+      "total_variation": 0.0002181885056655078,
+      "baseline_top1_probability": 0.9986489175674548,
+      "candidate_top1_probability": 0.9988671018477889,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 1.737378925177079e-07,
+      "total_variation": 2.4296921442850093e-06,
+      "baseline_top1_probability": 0.999976003698136,
+      "candidate_top1_probability": 0.9999784151472746,
+      "top1_equal": true
+    },
+    {
+      "kl_baseline_candidate": 0.00399085312874767,
+      "total_variation": 0.02821662382775279,
+      "baseline_top1_probability": 0.5907288669030395,
+      "candidate_top1_probability": 0.5972134559104917,
+      "top1_equal": true
+    }
+  ]
+}
+
