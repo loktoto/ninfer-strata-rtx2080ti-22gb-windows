@@ -35,3 +35,5 @@ The GGUF contains 120 IQ4_XS routed expert tensors in blocks 0–39 and three ad
 Strata and an NInfer-derived RMSNorm kernel are connected in the same inference process, and the candidate was enqueued on this GPU. **The candidate has not passed end-to-end numerical qualification:** leave it opt-in and retain the original Strata RMSNorm as the default. Do not claim equivalent logits, a speedup, MTP4 performance or 32K actual prompt coverage from these tests.
 
 Investigate the first divergence with full intermediate tensor comparisons and routing decisions, characterize accumulation/rounding and expert-selection sensitivity, and compare against an independent reference before changing any tolerances. Extend testing to varied prompts and free-generation quality. Any expert-kernel dispatch requires a separate workload that actually selects a compatible Q4_K or Q6_K path.
+
+Follow-up: [engine comparison and near-32K retrieval](IQ4XS_ENGINE_COMPARISON_2026-10-29.md) reports repeated short requests, long-prompt results and additional correctness checks.
