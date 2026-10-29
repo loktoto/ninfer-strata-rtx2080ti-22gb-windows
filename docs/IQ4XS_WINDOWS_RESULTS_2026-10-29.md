@@ -41,3 +41,5 @@ A separate RMSNorm request with a 512-token limit returned `Hello! How can I hel
 - The 32768 setting and health response do not establish that a full 32K prompt was processed or that full-context quality is correct.
 - The strict launcher disables MTP; no comparison with the reported MTP4 setup or 100 tokens/s was made. IQ4_XS expert matrices follow Strata's native path; there is no integrated NInfer IQ4_XS expert candidate.
 - Next, capture dispatch and numerical/logit evidence for the RMSNorm candidate, test longer actual prompt occupancy and free generation, and run repeated matched performance tests with the original MTP settings separately. The original Q4_K_M model lock must not be used to certify this different model.
+
+Follow-up: [RMSNorm dispatch and full-logit comparison](IQ4XS_RMSNORM_INTEGRATION_2026-10-29.md) observed a repeatable difference that failed the selected tolerances; the candidate remains unqualified.
