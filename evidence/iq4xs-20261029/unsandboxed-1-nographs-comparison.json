@@ -1,0 +1,590 @@
+{
+  "engine": "unsandboxed-1-nographs",
+  "port": 18101,
+  "process": "strata-poly.exe",
+  "settings": {
+    "temperature": 0,
+    "top_p": 1,
+    "max_tokens": 256,
+    "enable_thinking": false,
+    "repetitions": 3
+  },
+  "results": [
+    {
+      "case": "arithmetic",
+      "iteration": 1,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "A warehouse has 17 crates with 12 bottles each. It sells 47 bottles and receives 5 more crates of 12. How many bottles remain? Show the arithmetic."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "Here is the step-by-step arithmetic to determine the number of bottles remaining.\n\n**Step 1: Calculate the initial total number of bottles.**\nThe warehouse starts with 17 crates, and each crate contains 12 bottles.\n$$17 \\times 12 = 204 \\text{ bottles}$$\n\n**Step 2: Subtract the bottles sold.**\nThe warehouse sells 47 bottles.\n$$204 - 47 = 157 \\text{ bottles}$$\n\n**Step 3: Calculate the bottles added from the new crates.**\nThe warehouse receives 5 more crates, each containing 12 bottles.\n$$5 \\times 12 = 60 \\text{ bottles}$$\n\n**Step 4: Add the new bottles to the remaining stock.**\n$$157 + 60 = 217 \\text{ bottles}$$\n\n**Combined Equation:**\n$$17 \\times 12 - 47 + 5 \\times 12 = 217$$\n\n**Answer:**\nThere are **217** bottles remaining.",
+      "reasoning": "",
+      "ttft_seconds": 0.6083818000006431,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 240,
+        "total_tokens": 292,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 52,
+        "prompt_ms": 561.0,
+        "prompt_per_token_ms": 10.788,
+        "prompt_per_second": 92.7,
+        "predicted_n": 240,
+        "predicted_ms": 4067.5,
+        "predicted_per_token_ms": 16.948,
+        "predicted_per_second": 59.0,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 4.674845800000185
+    },
+    {
+      "case": "python",
+      "iteration": 1,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write a Python function is_prime(n) that returns True exactly when an integer n is prime. Do not import libraries. Give two short example calls."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    i = 3\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 2\n    return True\n\nprint(is_prime(7))   # True\nprint(is_prime(10))  # False\n```",
+      "reasoning": "",
+      "ttft_seconds": 0.18762759999935952,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "completion_tokens": 110,
+        "total_tokens": 152,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 42,
+        "prompt_ms": 181.1,
+        "prompt_per_token_ms": 4.312,
+        "prompt_per_second": 231.9,
+        "predicted_n": 110,
+        "predicted_ms": 1878.9,
+        "predicted_per_token_ms": 17.081,
+        "predicted_per_second": 58.5,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 2.0665094999994835
+    },
+    {
+      "case": "retrieval",
+      "iteration": 1,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Read the records below. What exact code belongs to Record 27? Reply with the code only.\n\nRecord 01: shelf B; code K001-037; status checked.\nRecord 02: shelf C; code K002-074; status checked.\nRecord 03: shelf D; code K003-111; status checked.\nRecord 04: shelf E; code K004-148; status checked.\nRecord 05: shelf F; code K005-185; status checked.\nRecord 06: shelf G; code K006-222; status checked.\nRecord 07: shelf H; code K007-259; status checked.\nRecord 08: shelf A; code K008-296; status checked.\nRecord 09: shelf B; code K009-333; status checked.\nRecord 10: shelf C; code K010-370; status checked.\nRecord 11: shelf D; code K011-407; status checked.\nRecord 12: shelf E; code K012-444; status checked.\nRecord 13: shelf F; code K013-481; status checked.\nRecord 14: shelf G; code K014-518; status checked.\nRecord 15: shelf H; code K015-555; status checked.\nRecord 16: shelf A; code K016-592; status checked.\nRecord 17: shelf B; code K017-629; status checked.\nRecord 18: shelf C; code K018-666; status checked.\nRecord 19: shelf D; code K019-703; status checked.\nRecord 20: shelf E; code K020-740; status checked.\nRecord 21: shelf F; code K021-777; status checked.\nRecord 22: shelf G; code K022-814; status checked.\nRecord 23: shelf H; code K023-851; status checked.\nRecord 24: shelf A; code K024-888; status checked.\nRecord 25: shelf B; code K025-925; status checked.\nRecord 26: shelf C; code K026-962; status checked.\nRecord 27: shelf D; code K027-002; status checked.\nRecord 28: shelf E; code K028-039; status checked.\nRecord 29: shelf F; code K029-076; status checked.\nRecord 30: shelf G; code K030-113; status checked.\nRecord 31: shelf H; code K031-150; status checked.\nRecord 32: shelf A; code K032-187; status checked.\nRecord 33: shelf B; code K033-224; status checked.\nRecord 34: shelf C; code K034-261; status checked.\nRecord 35: shelf D; code K035-298; status checked.\nRecord 36: shelf E; code K036-335; status checked.\nRecord 37: shelf F; code K037-372; status checked.\nRecord 38: shelf G; code K038-409; status checked.\nRecord 39: shelf H; code K039-446; status checked.\nRecord 40: shelf A; code K040-483; status checked.\nRecord 41: shelf B; code K041-520; status checked.\nRecord 42: shelf C; code K042-557; status checked.\nRecord 43: shelf D; code K043-594; status checked.\nRecord 44: shelf E; code K044-631; status checked.\nRecord 45: shelf F; code K045-668; status checked.\nRecord 46: shelf G; code K046-705; status checked.\nRecord 47: shelf H; code K047-742; status checked.\nRecord 48: shelf A; code K048-779; status checked.\nRecord 49: shelf B; code K049-816; status checked.\nRecord 50: shelf C; code K050-853; status checked."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "K027-002",
+      "reasoning": "",
+      "ttft_seconds": 0.6248482999999396,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 1133,
+        "completion_tokens": 9,
+        "total_tokens": 1142,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 1133,
+        "prompt_ms": 599.5,
+        "prompt_per_token_ms": 0.529,
+        "prompt_per_second": 1889.9,
+        "predicted_n": 9,
+        "predicted_ms": 126.7,
+        "predicted_per_token_ms": 14.078,
+        "predicted_per_second": 71.0,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 0.7515789999997651
+    },
+    {
+      "case": "arithmetic",
+      "iteration": 2,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "A warehouse has 17 crates with 12 bottles each. It sells 47 bottles and receives 5 more crates of 12. How many bottles remain? Show the arithmetic."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "Here is the step-by-step arithmetic to determine the number of bottles remaining.\n\n**Step 1: Calculate the initial total number of bottles.**\nThe warehouse starts with 17 crates, and each crate contains 12 bottles.\n$$17 \\times 12 = 204 \\text{ bottles}$$\n\n**Step 2: Subtract the bottles sold.**\nThe warehouse sells 47 bottles.\n$$204 - 47 = 157 \\text{ bottles}$$\n\n**Step 3: Calculate the bottles added from the new crates.**\nThe warehouse receives 5 more crates, each containing 12 bottles.\n$$5 \\times 12 = 60 \\text{ bottles}$$\n\n**Step 4: Add the new bottles to the remaining stock.**\n$$157 + 60 = 217 \\text{ bottles}$$\n\n**Combined Equation:**\n$$17 \\times 12 - 47 + 5 \\times 12 = 217$$\n\n**Answer:**\nThere are **217** bottles remaining.",
+      "reasoning": "",
+      "ttft_seconds": 0.1584125999997923,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 240,
+        "total_tokens": 292,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 52,
+        "prompt_ms": 154.9,
+        "prompt_per_token_ms": 2.979,
+        "prompt_per_second": 335.7,
+        "predicted_n": 240,
+        "predicted_ms": 3923.6,
+        "predicted_per_token_ms": 16.348,
+        "predicted_per_second": 61.2,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 4.081502
+    },
+    {
+      "case": "python",
+      "iteration": 2,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write a Python function is_prime(n) that returns True exactly when an integer n is prime. Do not import libraries. Give two short example calls."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    i = 3\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 2\n    return True\n\nprint(is_prime(7))   # True\nprint(is_prime(10))  # False\n```",
+      "reasoning": "",
+      "ttft_seconds": 0.1748013999995237,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "completion_tokens": 110,
+        "total_tokens": 152,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 42,
+        "prompt_ms": 149.8,
+        "prompt_per_token_ms": 3.567,
+        "prompt_per_second": 280.4,
+        "predicted_n": 110,
+        "predicted_ms": 1775.4,
+        "predicted_per_token_ms": 16.14,
+        "predicted_per_second": 62.0,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 1.9503826000000117
+    },
+    {
+      "case": "retrieval",
+      "iteration": 2,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Read the records below. What exact code belongs to Record 27? Reply with the code only.\n\nRecord 01: shelf B; code K001-037; status checked.\nRecord 02: shelf C; code K002-074; status checked.\nRecord 03: shelf D; code K003-111; status checked.\nRecord 04: shelf E; code K004-148; status checked.\nRecord 05: shelf F; code K005-185; status checked.\nRecord 06: shelf G; code K006-222; status checked.\nRecord 07: shelf H; code K007-259; status checked.\nRecord 08: shelf A; code K008-296; status checked.\nRecord 09: shelf B; code K009-333; status checked.\nRecord 10: shelf C; code K010-370; status checked.\nRecord 11: shelf D; code K011-407; status checked.\nRecord 12: shelf E; code K012-444; status checked.\nRecord 13: shelf F; code K013-481; status checked.\nRecord 14: shelf G; code K014-518; status checked.\nRecord 15: shelf H; code K015-555; status checked.\nRecord 16: shelf A; code K016-592; status checked.\nRecord 17: shelf B; code K017-629; status checked.\nRecord 18: shelf C; code K018-666; status checked.\nRecord 19: shelf D; code K019-703; status checked.\nRecord 20: shelf E; code K020-740; status checked.\nRecord 21: shelf F; code K021-777; status checked.\nRecord 22: shelf G; code K022-814; status checked.\nRecord 23: shelf H; code K023-851; status checked.\nRecord 24: shelf A; code K024-888; status checked.\nRecord 25: shelf B; code K025-925; status checked.\nRecord 26: shelf C; code K026-962; status checked.\nRecord 27: shelf D; code K027-002; status checked.\nRecord 28: shelf E; code K028-039; status checked.\nRecord 29: shelf F; code K029-076; status checked.\nRecord 30: shelf G; code K030-113; status checked.\nRecord 31: shelf H; code K031-150; status checked.\nRecord 32: shelf A; code K032-187; status checked.\nRecord 33: shelf B; code K033-224; status checked.\nRecord 34: shelf C; code K034-261; status checked.\nRecord 35: shelf D; code K035-298; status checked.\nRecord 36: shelf E; code K036-335; status checked.\nRecord 37: shelf F; code K037-372; status checked.\nRecord 38: shelf G; code K038-409; status checked.\nRecord 39: shelf H; code K039-446; status checked.\nRecord 40: shelf A; code K040-483; status checked.\nRecord 41: shelf B; code K041-520; status checked.\nRecord 42: shelf C; code K042-557; status checked.\nRecord 43: shelf D; code K043-594; status checked.\nRecord 44: shelf E; code K044-631; status checked.\nRecord 45: shelf F; code K045-668; status checked.\nRecord 46: shelf G; code K046-705; status checked.\nRecord 47: shelf H; code K047-742; status checked.\nRecord 48: shelf A; code K048-779; status checked.\nRecord 49: shelf B; code K049-816; status checked.\nRecord 50: shelf C; code K050-853; status checked."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "K027-002",
+      "reasoning": "",
+      "ttft_seconds": 0.5920458000000508,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 1133,
+        "completion_tokens": 9,
+        "total_tokens": 1142,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 1133,
+        "prompt_ms": 569.5,
+        "prompt_per_token_ms": 0.503,
+        "prompt_per_second": 1989.5,
+        "predicted_n": 9,
+        "predicted_ms": 138.0,
+        "predicted_per_token_ms": 15.333,
+        "predicted_per_second": 65.2,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 0.7301784000001135
+    },
+    {
+      "case": "arithmetic",
+      "iteration": 3,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "A warehouse has 17 crates with 12 bottles each. It sells 47 bottles and receives 5 more crates of 12. How many bottles remain? Show the arithmetic."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "Here is the step-by-step arithmetic to determine the number of bottles remaining.\n\n**Step 1: Calculate the initial total number of bottles.**\nThe warehouse starts with 17 crates, and each crate contains 12 bottles.\n$$17 \\times 12 = 204 \\text{ bottles}$$\n\n**Step 2: Subtract the bottles sold.**\nThe warehouse sells 47 bottles.\n$$204 - 47 = 157 \\text{ bottles}$$\n\n**Step 3: Calculate the bottles added from the new crates.**\nThe warehouse receives 5 more crates, each containing 12 bottles.\n$$5 \\times 12 = 60 \\text{ bottles}$$\n\n**Step 4: Add the new bottles to the remaining stock.**\n$$157 + 60 = 217 \\text{ bottles}$$\n\n**Combined Equation:**\n$$17 \\times 12 - 47 + 5 \\times 12 = 217$$\n\n**Answer:**\nThere are **217** bottles remaining.",
+      "reasoning": "",
+      "ttft_seconds": 0.16926899999998568,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 52,
+        "completion_tokens": 240,
+        "total_tokens": 292,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 52,
+        "prompt_ms": 166.8,
+        "prompt_per_token_ms": 3.208,
+        "prompt_per_second": 311.8,
+        "predicted_n": 240,
+        "predicted_ms": 4345.8,
+        "predicted_per_token_ms": 18.108,
+        "predicted_per_second": 55.2,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 4.5153817000000345
+    },
+    {
+      "case": "python",
+      "iteration": 3,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Write a Python function is_prime(n) that returns True exactly when an integer n is prime. Do not import libraries. Give two short example calls."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    i = 3\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 2\n    return True\n\nprint(is_prime(7))   # True\nprint(is_prime(10))  # False\n```",
+      "reasoning": "",
+      "ttft_seconds": 0.15427309999995487,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 42,
+        "completion_tokens": 110,
+        "total_tokens": 152,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 42,
+        "prompt_ms": 152.0,
+        "prompt_per_token_ms": 3.619,
+        "prompt_per_second": 276.3,
+        "predicted_n": 110,
+        "predicted_ms": 1811.3,
+        "predicted_per_token_ms": 16.466,
+        "predicted_per_second": 60.7,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 1.9657577999996647
+    },
+    {
+      "case": "retrieval",
+      "iteration": 3,
+      "request": {
+        "model": "sage-a1.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Read the records below. What exact code belongs to Record 27? Reply with the code only.\n\nRecord 01: shelf B; code K001-037; status checked.\nRecord 02: shelf C; code K002-074; status checked.\nRecord 03: shelf D; code K003-111; status checked.\nRecord 04: shelf E; code K004-148; status checked.\nRecord 05: shelf F; code K005-185; status checked.\nRecord 06: shelf G; code K006-222; status checked.\nRecord 07: shelf H; code K007-259; status checked.\nRecord 08: shelf A; code K008-296; status checked.\nRecord 09: shelf B; code K009-333; status checked.\nRecord 10: shelf C; code K010-370; status checked.\nRecord 11: shelf D; code K011-407; status checked.\nRecord 12: shelf E; code K012-444; status checked.\nRecord 13: shelf F; code K013-481; status checked.\nRecord 14: shelf G; code K014-518; status checked.\nRecord 15: shelf H; code K015-555; status checked.\nRecord 16: shelf A; code K016-592; status checked.\nRecord 17: shelf B; code K017-629; status checked.\nRecord 18: shelf C; code K018-666; status checked.\nRecord 19: shelf D; code K019-703; status checked.\nRecord 20: shelf E; code K020-740; status checked.\nRecord 21: shelf F; code K021-777; status checked.\nRecord 22: shelf G; code K022-814; status checked.\nRecord 23: shelf H; code K023-851; status checked.\nRecord 24: shelf A; code K024-888; status checked.\nRecord 25: shelf B; code K025-925; status checked.\nRecord 26: shelf C; code K026-962; status checked.\nRecord 27: shelf D; code K027-002; status checked.\nRecord 28: shelf E; code K028-039; status checked.\nRecord 29: shelf F; code K029-076; status checked.\nRecord 30: shelf G; code K030-113; status checked.\nRecord 31: shelf H; code K031-150; status checked.\nRecord 32: shelf A; code K032-187; status checked.\nRecord 33: shelf B; code K033-224; status checked.\nRecord 34: shelf C; code K034-261; status checked.\nRecord 35: shelf D; code K035-298; status checked.\nRecord 36: shelf E; code K036-335; status checked.\nRecord 37: shelf F; code K037-372; status checked.\nRecord 38: shelf G; code K038-409; status checked.\nRecord 39: shelf H; code K039-446; status checked.\nRecord 40: shelf A; code K040-483; status checked.\nRecord 41: shelf B; code K041-520; status checked.\nRecord 42: shelf C; code K042-557; status checked.\nRecord 43: shelf D; code K043-594; status checked.\nRecord 44: shelf E; code K044-631; status checked.\nRecord 45: shelf F; code K045-668; status checked.\nRecord 46: shelf G; code K046-705; status checked.\nRecord 47: shelf H; code K047-742; status checked.\nRecord 48: shelf A; code K048-779; status checked.\nRecord 49: shelf B; code K049-816; status checked.\nRecord 50: shelf C; code K050-853; status checked."
+          }
+        ],
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": 256,
+        "seed": 1,
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "content": "K027-002",
+      "reasoning": "",
+      "ttft_seconds": 0.562445800000205,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 1133,
+        "completion_tokens": 9,
+        "total_tokens": 1142,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 1133,
+        "prompt_ms": 559.7,
+        "prompt_per_token_ms": 0.494,
+        "prompt_per_second": 2024.3,
+        "predicted_n": 9,
+        "predicted_ms": 139.2,
+        "predicted_per_token_ms": 15.467,
+        "predicted_per_second": 64.7,
+        "draft_n": 0,
+        "draft_n_accepted": 0
+      },
+      "done": true,
+      "http_status": 200,
+      "wall_seconds": 0.701799999999821
+    }
+  ],
+  "memory_samples": [
+    {
+      "gpu_used_mib": 20221,
+      "gpu_free_mib": 2010,
+      "process_working_set_bytes": 9288572928
+    },
+    {
+      "gpu_used_mib": 20246,
+      "gpu_free_mib": 1985,
+      "process_working_set_bytes": 9249468416
+    },
+    {
+      "gpu_used_mib": 20246,
+      "gpu_free_mib": 1985,
+      "process_working_set_bytes": 9123835904
+    },
+    {
+      "gpu_used_mib": 20244,
+      "gpu_free_mib": 1987,
+      "process_working_set_bytes": 9123856384
+    },
+    {
+      "gpu_used_mib": 20244,
+      "gpu_free_mib": 1987,
+      "process_working_set_bytes": 9090342912
+    },
+    {
+      "gpu_used_mib": 20242,
+      "gpu_free_mib": 1989,
+      "process_working_set_bytes": 9091076096
+    },
+    {
+      "gpu_used_mib": 20284,
+      "gpu_free_mib": 1947,
+      "process_working_set_bytes": 9091141632
+    },
+    {
+      "gpu_used_mib": 20249,
+      "gpu_free_mib": 1982,
+      "process_working_set_bytes": 9008832512
+    },
+    {
+      "gpu_used_mib": 20249,
+      "gpu_free_mib": 1982,
+      "process_working_set_bytes": 9103241216
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086468096
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086472192
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086488576
+    },
+    {
+      "gpu_used_mib": 20246,
+      "gpu_free_mib": 1985,
+      "process_working_set_bytes": 9086492672
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 8954761216
+    },
+    {
+      "gpu_used_mib": 20290,
+      "gpu_free_mib": 1941,
+      "process_working_set_bytes": 9086517248
+    },
+    {
+      "gpu_used_mib": 20249,
+      "gpu_free_mib": 1982,
+      "process_working_set_bytes": 9086517248
+    },
+    {
+      "gpu_used_mib": 20249,
+      "gpu_free_mib": 1982,
+      "process_working_set_bytes": 9086517248
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086517248
+    },
+    {
+      "gpu_used_mib": 20249,
+      "gpu_free_mib": 1982,
+      "process_working_set_bytes": 9086517248
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086521344
+    },
+    {
+      "gpu_used_mib": 20247,
+      "gpu_free_mib": 1984,
+      "process_working_set_bytes": 9086521344
+    }
+  ]
+}
+
