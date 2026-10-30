@@ -1,0 +1,31 @@
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -480,6 +480,9 @@
+     if (up_) cudaStreamSynchronize(cs(up_));
+     if (rs_) cudaStreamSynchronize(cs(rs_));
+     if (st_) cudaStreamSynchronize(cs(st_));
++#ifdef STRATA_SAGE_EXPERT_IQ4XS_BACKEND
++    sage::cuda::report_iq4xs_counts();
++#endif
+     workers_.reset();
+     mmq_.reset();
+     for (void* p : dev_allocs_) cudaFree(p);
+@@ -2506,12 +2509,18 @@
+     const void* const* table = d_slots_ + (size_t) il * n_expert_;
+     const kernels::MmvqIds gate_up{table, d_ids_, 0, xq_, kernels::native_q8_1_bytes(n_embd_), n_used_, g_,
+                                    2 * (size_t) n_ff_exp_};
++#ifdef STRATA_SAGE_EXPERT_IQ4XS_BACKEND
++    if (!sage::strata::try_expert_iq4xs_ids((int) L.gu_type, gate_up, rr, n_embd_, 2 * n_ff_exp_, st_, il))
++#endif
+     kernels::native_mmvq_ids((int) L.gu_type, gate_up, rr, n_embd_, 2 * n_ff_exp_, st_);
+     if (gelu_) geglu_rows(g_, h_, n_ff_exp_, rr, st_);
+     else swiglu_clamp_rows(g_, h_, n_ff_exp_, rr, clamp_exp_[(size_t) il], st_);
+     kernels::native_quantize_q8_1(h_, q8_, n_ff_exp_ * rr, 1, st_);   // the rows back to back, as one vector
+     const kernels::MmvqIds down{table, d_ids_, 2 * L.gu_bytes, q8_, kernels::native_q8_1_bytes(n_ff_exp_), 1, d_,
+                                 (size_t) n_embd_};
++#ifdef STRATA_SAGE_EXPERT_IQ4XS_BACKEND
++    if (!sage::strata::try_expert_iq4xs_ids((int) L.d_type, down, rr, n_ff_exp_, n_embd_, st_, il))
++#endif
+     kernels::native_mmvq_ids((int) L.d_type, down, rr, n_ff_exp_, n_embd_, st_);
+     moe_sum(d_, d_wts_, fo_, n_embd_, n_used_, n, st_);
+     return true;

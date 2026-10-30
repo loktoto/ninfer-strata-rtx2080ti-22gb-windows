@@ -10,3 +10,5 @@ target_include_directories(strata-poly PRIVATE "${CMAKE_CURRENT_LIST_DIR}/includ
 target_compile_definitions(strata-poly PRIVATE
   STRATA_SAGE_INTEGRATION=1 STRATA_SAGE_EXPERT_Q4K_BACKEND=1 STRATA_SAGE_EXPERT_Q6K_BACKEND=1 STRATA_SAGE_EXPERT_IQ4XS_BACKEND=1)
 
+add_executable(sage_iq4xs_ids_bench "${CMAKE_SOURCE_DIR}/kernels/tests/iq4xs_ids_bench.cpp")
+target_link_libraries(sage_iq4xs_ids_bench PRIVATE sage_sm75_kernels strata_kernels CUDA::cudart)
