@@ -13,20 +13,18 @@ research for a later phase. See the [active roadmap](docs/ROADMAP.md).
 The owner's current test target is **Sage-A1.5 IQ4_XS, MTP4, 32K configured
 capacity**. Read [IQ4_XS testing readiness](docs/IQ4XS_TESTING.md) before testing:
 current strict launchers disable MTP and the original Q4_K_M model lock cannot
-qualify a different IQ4_XS file. Developer smoke testing is prepared; a matched
-IQ4_XS/MTP4 performance comparison is not yet prepared.
+qualify a different IQ4_XS file. The IQ4_XS expert candidate has a local GPU and model test; a matched
+IQ4_XS/MTP4 performance comparison is not yet prepared. See [IQ4_XS expert integration](docs/IQ4XS_EXPERT_INTEGRATION_2026-10-30.md).
 
 ## What is implemented
 
 - Pinned PolyStrata integration patch and reproducible source preparation.
-- An opt-in NInfer-derived FP32 RMSNorm kernel using Strata-owned buffers/stream,
-  plus independent numerical GPU parity tests. Default execution keeps Strata's
-  original kernel until target validation permits selecting the new path.
+- An experimental opt-in NInfer-derived FP32 RMSNorm kernel. Its synthetic oracle
+  passes, but full-model logits diverge; leave it disabled for normal use.
 - A strict baseline launcher that disables expert skipping and speculative decode.
 - An opt-in Q4_K expert-slot GEMV path using Strata-owned Q8_1 scratch and its
   existing stream, with independent GPU oracle tests; numerical qualification pending.
-- An opt-in Q6_K expert path adapted from NInfer-all, borrowing the same slots
-  without converting weights.
+- Opt-in Q6_K and IQ4_XS expert paths adapted from NInfer-all, borrowing Strata's slots without converting weights. IQ4_XS model testing found no decode speedup.
 - Host slot-generation/reader-lease and KV-budget contracts, tested independently;
   these are not yet connected to Strata's CUDA events or live eviction logic.
 - An official Sage model lock and bounded GGUF tensor inventory tool.
@@ -68,10 +66,11 @@ The build links one inference engine; it does not launch a second NInfer engine.
 Build and run the separate numerical kernel check on the SM75 machine:
 
 ```powershell
-cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity --parallel 2
+cmake --build build-windows --target sage_rmsnorm_parity sage_q4k_slots_parity sage_q6k_slots_parity sage_iq4xs_slots_parity --parallel 2
 .\build-windows\kernels\sage_rmsnorm_parity.exe
 .\build-windows\kernels\sage_q4k_slots_parity.exe
 .\build-windows\kernels\sage_q6k_slots_parity.exe
+.\build-windows\kernels\sage_iq4xs_slots_parity.exe
 ```
 
 Then follow the [strict launch instructions](integration/strata/README.md).
@@ -150,3 +149,4 @@ The [Q6_K donor integration](docs/Q6K_DONOR.md) is selected with
 `--candidate expert-q6k` or `--candidate all`; `both` retains RMSNorm plus Q4_K.
 All candidates remain off by default. The [Windows testing packager](docs/WINDOWS_PACKAGE.md)
 resolves transitive DLL imports for an unqualified development ZIP.
+

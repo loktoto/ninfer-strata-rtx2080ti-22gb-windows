@@ -1,0 +1,4 @@
+[strata] 2026-10-29 23:19:40 engine started: D:\AI\ninfer-strata-test\build-windows\strata\strata-poly.exe --serve --model D:\AI\LLM\models\sage\Sage-A1.5-IQ4_XS-exps.gguf --tail-skip 0 --skip-weight 0 --no-draft --lookup 0 --window 1 --kv fp16 --max-context 32768 --threads 16
+strata-poly: the experts' split is frozen for the engine's whole run (STRATA_FREEZE_EXPERTS): greedy answers are a function of the request alone, and the only cache change after load is the serve VRAM resize
+strata-poly: loaded in 64.3 s; 10240 of 10240 routed experts in VRAM (15.9 GiB), 16 CPU threads
+sage-dispatch: expert-iq4xs

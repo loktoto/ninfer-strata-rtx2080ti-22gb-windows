@@ -14,7 +14,7 @@ DEFAULTS = ["--tail-skip", "0", "--skip-weight", "0", "--no-draft", "--lookup", 
 
 
 def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None,
-                ninfer_expert_q4k=False, ninfer_expert_q6k=False):
+                ninfer_expert_q4k=False, ninfer_expert_q6k=False, ninfer_expert_iq4xs=False):
     """Return shell-free argv/environment, rejecting conflicting passthrough flags."""
     extra = list(extra)
     if extra and extra[0] == "--":
@@ -31,7 +31,8 @@ def launch_spec(engine, model, extra=(), ninfer_rmsnorm=False, environ=None,
     env.update(STRATA_ROUTE_TAIL_SKIP="0", STRATA_FREEZE_EXPERTS="1", STRATA_SAGE_TRACE="0",
                STRATA_SAGE_RMSNORM="1" if ninfer_rmsnorm else "0",
                STRATA_SAGE_EXPERT_Q4K="1" if ninfer_expert_q4k else "0",
-               STRATA_SAGE_EXPERT_Q6K="1" if ninfer_expert_q6k else "0")
+               STRATA_SAGE_EXPERT_Q6K="1" if ninfer_expert_q6k else "0",
+               STRATA_SAGE_EXPERT_IQ4XS="1" if ninfer_expert_iq4xs else "0")
     return [str(engine), "--model", str(model), *DEFAULTS, *extra], env
 
 
@@ -44,21 +45,23 @@ def main(argv=None):
     parser.add_argument("--ninfer-expert-q4k", action="store_true",
                         help="Opt into experimental direct Q4_K cached expert-slot products")
     parser.add_argument("--ninfer-expert-q6k", action="store_true", help="Opt into NInfer-all-derived Q6_K slot products")
+    parser.add_argument("--ninfer-expert-iq4xs", action="store_true", help="Opt into experimental NInfer-all IQ4_XS expert slots")
     parser.add_argument("--dry-run", action="store_true", help="Print the exact launch without running")
     parser.add_argument("engine_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     try:
         command, env = launch_spec(args.engine, args.model, args.engine_args, args.ninfer_rmsnorm,
-                                  ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k)
+                                  ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k, ninfer_expert_iq4xs=args.ninfer_expert_iq4xs)
     except ValueError as exc:
         parser.error(str(exc))
     if args.dry_run:
         print(json.dumps({"argv": command, "environment": {key: env[key] for key in
               ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS", "STRATA_SAGE_RMSNORM",
-               "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_EXPERT_Q6K")}}, indent=2))
+               "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_EXPERT_Q6K", "STRATA_SAGE_EXPERT_IQ4XS")}}, indent=2))
         return 0
     return subprocess.run(command, env=env, check=False).returncode
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
