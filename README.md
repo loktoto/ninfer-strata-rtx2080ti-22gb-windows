@@ -4,7 +4,7 @@ One Strata-owned runtime for Sage-A1.5 Q4_K_M on Windows 11 x64 and the
 RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
 **Development implementation; hardware acceptance is pending.** This repository
-does not yet provide a qualified Windows executable. No throughput or 256K-context success is claimed.
+does not yet provide a qualified Windows executable. Bounded on-device throughput measurements are published below; no 256K-context success is claimed.
 
 **Current scope: Strata + NInfer on normal SM75. Turing Unlock is deferred**
 by the project owner; it is not a dependency of this release. Preserve its
@@ -16,6 +16,10 @@ current strict launchers disable MTP and the original Q4_K_M model lock cannot
 qualify a different IQ4_XS file. The IQ4_XS expert candidate has a local GPU and model test; a matched
 IQ4_XS/MTP4 performance comparison is not yet prepared. See [IQ4_XS expert integration](docs/IQ4XS_EXPERT_INTEGRATION_2026-10-30.md).
 
+## Methodology, achievements, and A/B/C/D evidence
+
+Start with [how we built and tested the integration](docs/METHODOLOGY_AND_RESULTS.md), the [A/B/C/D comparison](docs/ABCD_COMPARISON_2026-10-30.md), and the [evidence recovery audit](docs/EVIDENCE_AUDIT_2026-10-30.md). The audit restores numeric datasets that were present locally but missing from GitHub, while retaining failed and superseded experiments. A is Sage through llama.cpp, B native Strata, C standalone NInfer (not yet measured with this exact model), and D the combined Strata/NInfer-derived expert path. Graph-option gains are reported separately from NInfer kernel gains.
+
 ## What is implemented
 
 - Pinned PolyStrata integration patch and reproducible source preparation.
@@ -24,7 +28,7 @@ IQ4_XS/MTP4 performance comparison is not yet prepared. See [IQ4_XS expert integ
 - A strict baseline launcher that disables expert skipping and speculative decode.
 - An opt-in Q4_K expert-slot GEMV path using Strata-owned Q8_1 scratch and its
   existing stream, with independent GPU oracle tests; numerical qualification pending.
-- Opt-in Q6_K and IQ4_XS expert paths adapted from NInfer-all, borrowing Strata's slots without converting weights. IQ4_XS model testing found no decode speedup.
+- Opt-in Q6_K and IQ4_XS expert paths adapted from NInfer-all, borrowing Strata's slots without converting weights. The corrected resident IQ4_XS path measured a 6.6–6.8% decode gain in a bounded same-session trial; see the methodology and current A/B/C/D status below.
 - Host slot-generation/reader-lease and KV-budget contracts, tested independently;
   these are not yet connected to Strata's CUDA events or live eviction logic.
 - An official Sage model lock and bounded GGUF tensor inventory tool.
