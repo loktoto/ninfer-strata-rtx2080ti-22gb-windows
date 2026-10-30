@@ -19,5 +19,12 @@ inline bool try_expert_iq4xs_slots(int type, const Slots& slots, int count,
     trace_dispatch(DispatchTrace::expert_iq4xs);
     return true;
 }
+template<class Ids>
+inline bool try_expert_iq4xs_ids(int type, const Ids& ids, int count, int n_in, int n_out, void* stream, int layer) {
+    const char* enabled=std::getenv("STRATA_SAGE_EXPERT_IQ4XS");
+    if (!enabled || std::strcmp(enabled,"1") != 0 || type != 23) return false;
+    sage::cuda::IQ4XSIds borrowed{ids.table,ids.ids,ids.offset,ids.x,ids.x_stride,ids.x_every,ids.y,ids.y_stride,layer};
+    return sage::cuda::try_iq4xs_ids_q8_1(borrowed,count,n_in,n_out,stream);
+}
 } // namespace sage::strata
 

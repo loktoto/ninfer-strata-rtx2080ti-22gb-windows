@@ -4,7 +4,8 @@
 #include <stdexcept>
 
 namespace {
-int calls = 0, enqueued = 0;
+int calls = 0, enqueued = 0, id_calls = 0;
+sage::cuda::IQ4XSIds seen_ids{};
 bool accept = true, fail = false;
 sage::cuda::IQ4XSSlots seen{};
 int seen_count = 0, seen_in = 0, seen_out = 0;
@@ -33,6 +34,10 @@ bool sage::cuda::try_iq4xs_slots_q8_1(const IQ4XSSlots& slots, int count, int n_
     seen_stream = stream;
     ++enqueued;
     return true;
+}
+
+bool sage::cuda::try_iq4xs_ids_q8_1(const IQ4XSIds& ids,int,int,int,void*) {
+    ++id_calls; seen_ids=ids; return true;
 }
 
 int main() {
@@ -70,6 +75,17 @@ int main() {
     // One cached expert and a default stream are supported too.
     if (!sage::strata::try_expert_iq4xs_slots(23, slots, 1, 256, 3, nullptr) || seen_stream != nullptr)
         return 5;
+    struct RuntimeIds { const void* const* table; const int* ids; unsigned long long offset;
+        const void* x; unsigned long long x_stride; int x_every; float* y; unsigned long long y_stride; };
+    const void* table[1]={weights}; int indices[1]={0};
+    RuntimeIds ids{table,indices,16,inputs,144,2,outputs,2048};
+    set_flag("0");
+    if(sage::strata::try_expert_iq4xs_ids(23,ids,1,2048,1024,stream,7) || id_calls) return 8;
+    set_flag("1");
+    if(sage::strata::try_expert_iq4xs_ids(14,ids,1,2048,1024,stream,7) || id_calls) return 9;
+    if(!sage::strata::try_expert_iq4xs_ids(23,ids,1,2048,1024,stream,7) || id_calls!=1 ||
+       seen_ids.table!=table || seen_ids.ids!=indices || seen_ids.offset!=16 || seen_ids.x!=inputs ||
+       seen_ids.x_stride!=144 || seen_ids.x_every!=2 || seen_ids.y!=outputs || seen_ids.y_stride!=2048 || seen_ids.layer!=7) return 10;
     accept = false;
     if (dispatch() || enqueued != 2) return 6;
     fail = true;

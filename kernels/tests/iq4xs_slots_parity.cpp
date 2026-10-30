@@ -36,7 +36,12 @@ int read_code(const std::uint8_t* p,int index) {
 }
 int signed_byte(std::uint8_t b) { return b < 128 ? int(b) : int(b) - 256; }
 void oracle_self_test() {
-    for (int c=0;c<16;++c) { std::array<std::uint8_t,136> p{}; for(int i=0;i<256;++i) pack_code(p.data(),i,c); }
+    constexpr int table[16]={-127,-104,-83,-65,-49,-35,-22,-10,1,13,25,38,53,69,89,113};
+    for (int c=0;c<16;++c) {
+        std::array<std::uint8_t,136> p{};
+        for(int i=0;i<256;++i) pack_code(p.data(),i,(c+i*7)%16);
+        for(int i=0;i<256;++i) require(read_code(p.data(),i)==table[(c+i*7)%16],"IQ4_XS code round trip");
+    }
     const std::uint8_t one[] = {0, 60}, neg[] = {0, 188}, sub[] = {1, 0};
     require(half(one) == 1 && half(neg) == -1 && half(sub) == std::ldexp(1.0L, -24), "half decode");
 }
@@ -178,6 +183,45 @@ double run_case(int n_in, int n_out, int count, int pattern, bool capture, bool 
     check(cudaGraphDestroy(empty));
     return maximum_error;
 }
+// Exercise device-side routing, nonzero weight offsets, permuted experts,
+// activation/output strides and graph replay against the same scalar oracle.
+double run_ids_case(int ni,int no,int count,int x_every) {
+    Stream stream; auto st=stream.stream; const size_t wb=size_t(ni/256)*no*136, xb=size_t(ni/32)*36;
+    const size_t x_stride=xb+16, y_stride=size_t(no)+4;
+    std::vector<Fixture> f; f.reserve(count);
+    std::array<std::unique_ptr<Allocation>,8> dw; const void* host_table[8]{}; int host_ids[8]{};
+    for(int j=0;j<count;++j) {
+        f.emplace_back(ni,no,j,2); const int idx=count-1-j; host_ids[j]=idx;
+        dw[idx]=std::make_unique<Allocation>(wb+16);host_table[idx]=dw[idx]->pointer;
+        check(cudaMemcpyAsync(static_cast<std::uint8_t*>(dw[idx]->pointer)+16,f[j].w.data(),wb,cudaMemcpyHostToDevice,st));
+    }
+    Allocation table(count*sizeof(void*)), ids(count*sizeof(int)), x(count*x_stride), y(count*y_stride*sizeof(float));
+    check(cudaMemcpyAsync(table.pointer,host_table,count*sizeof(void*),cudaMemcpyHostToDevice,st));
+    check(cudaMemcpyAsync(ids.pointer,host_ids,count*sizeof(int),cudaMemcpyHostToDevice,st));
+    for(int j=0;j<count/x_every+(count%x_every!=0);++j)
+        check(cudaMemcpyAsync(static_cast<std::uint8_t*>(x.pointer)+j*x_stride,f[j].x.data(),xb,cudaMemcpyHostToDevice,st));
+    std::vector<float> out(count*y_stride,123456.f);
+    check(cudaMemcpyAsync(y.pointer,out.data(),out.size()*sizeof(float),cudaMemcpyHostToDevice,st));
+    sage::cuda::IQ4XSIds args{static_cast<const void* const*>(table.pointer),static_cast<const int*>(ids.pointer),16,
+        x.pointer,x_stride,x_every,static_cast<float*>(y.pointer),y_stride,-1};
+    check(cudaStreamSynchronize(st));check(cudaStreamBeginCapture(st,cudaStreamCaptureModeGlobal));
+    require(sage::cuda::try_iq4xs_ids_q8_1(args,count,ni,no,st),"ids rejected");
+    cudaGraph_t graph;cudaGraphExec_t exec;check(cudaStreamEndCapture(st,&graph));check(cudaGraphInstantiate(&exec,graph,nullptr,nullptr,0));
+    check(cudaGraphLaunch(exec,st));check(cudaGraphLaunch(exec,st));
+    check(cudaMemcpyAsync(out.data(),y.pointer,out.size()*sizeof(float),cudaMemcpyDeviceToHost,st));check(cudaStreamSynchronize(st));
+    check(cudaGraphExecDestroy(exec));check(cudaGraphDestroy(graph));
+    double maxerr=0;
+    for(int j=0;j<count;++j) { Fixture expected=f[j]; expected.x=f[j/x_every].x;
+        for(int row=0;row<no;++row) { auto ref=oracle(expected,ni,row);float actual=out[size_t(j)*y_stride+row];
+            long double err=std::abs((long double)actual-ref.value);maxerr=std::max(maxerr,(double)err);
+            require(std::isfinite(actual) && err<=2e-5L+3e-6L*ref.magnitude,"ids oracle mismatch"); }
+        for(size_t k=no;k<y_stride;++k)require(out[size_t(j)*y_stride+k]==123456.f,"ids output guard");
+    }
+    auto invalid=args; invalid.x_every=0; require(!sage::cuda::try_iq4xs_ids_q8_1(invalid,count,ni,no,st),"invalid x_every accepted");
+    invalid=args; invalid.y_stride=no-1; require(!sage::cuda::try_iq4xs_ids_q8_1(invalid,count,ni,no,st),"invalid y_stride accepted");
+    return maxerr;
+}
+
 #endif
 } // namespace
 
@@ -222,6 +266,9 @@ int main() {
         maximum_error = std::max(maximum_error, run_case(512, 2048, 8, 0, true, false));
         maximum_error = std::max(maximum_error, run_case(2048, 1024, 8, 0, false, false));
         cases += 2;
+        for(int ni : {512,2048}) for(int count : {1,3,8}) for(int every : {1,2}) {
+            maximum_error=std::max(maximum_error,run_ids_case(ni,ni==512?2048:1024,count,every)); ++cases;
+        }
         std::cout << "PASS iq4xs_slots_cases=" << cases << " max_abs_error=" << maximum_error
                   << " criterion=2e-5+3e-6*sum_abs_products\n";
 #endif
