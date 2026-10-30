@@ -50,6 +50,7 @@ def main(argv=None):
     parser.add_argument("--threads", type=positive_int, help="CPU threads for uncached experts")
     parser.add_argument("--ninfer-rmsnorm", action="store_true", help="opt into the experimental RMSnorm candidate")
     parser.add_argument("--ninfer-expert-q4k", action="store_true", help="opt into the experimental Q4_K candidate")
+    parser.add_argument("--ninfer-expert-iq4xs", action="store_true", help="opt into the experimental IQ4_XS expert candidate")
     parser.add_argument("--ninfer-expert-q6k", action="store_true", help="opt into the Q6_K candidate")
     parser.add_argument("--dry-run", action="store_true", help="validate paths and print the plan without writing files or starting inference; also works on Linux")
     args = parser.parse_args(argv)
@@ -63,7 +64,7 @@ def main(argv=None):
         if args.threads is not None:
             extra += ["--threads", str(args.threads)]
         engine_command, env = launch_spec(args.engine, args.model, extra,
-                                         args.ninfer_rmsnorm, ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k)
+                                         args.ninfer_rmsnorm, ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k, ninfer_expert_iq4xs=args.ninfer_expert_iq4xs)
         if Path(engine_command[0]).stem.lower() not in {"strata-poly", "strata-glm"}:
             raise ValueError("--engine must be named strata-poly.exe (or strata-poly on Linux dry runs); the server selects its GGUF protocol by executable name")
         validate_upstream(upstream)
@@ -112,3 +113,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

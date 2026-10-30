@@ -1,5 +1,7 @@
 # Sage-A1.5 IQ4_XS testing readiness
 
+**Historical readiness snapshot:** the IQ4_XS expert path was subsequently integrated and tested; see [IQ4_XS expert integration](IQ4XS_EXPERT_INTEGRATION_2026-10-30.md) for current results. RMSNorm remains unqualified.
+
 Current scope is **Strata + NInfer only, normal SM75**. Bootstrap fetches only
 PolyStrata; CMake links the borrowed-buffer kernel library into `strata-poly`.
 No second NInfer runtime is launched. Deferred unlock source metadata is stored
@@ -57,3 +59,4 @@ same settings and prompt/output lengths with repeated non-diagnostic runs.
 Record prompt processing separately from accepted output tokens/s, MTP draft
 counts/acceptance, TTFT, peak VRAM and CPU misses. Preserve the original engine
 and configuration for comparison. No speedup over the reported result is claimed.
+

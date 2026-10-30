@@ -19,3 +19,8 @@ The GGUF Q6_K byte decoder is adapted from iamwavecut/ninfer-all,
 commit 71d3f8190772ef7089f8eda4e22371114fd5bbf9, under Apache-2.0.
 Its block layout follows ggml Q6_K; source and numerical details are recorded
 in docs/Q6K_DONOR.md.
+
+
+The IQ4_XS decoder and two-row warp vector schedule are adapted from
+iamwavecut/ninfer-all, commit 71d3f8190772ef7089f8eda4e22371114fd5bbf9,
+under Apache-2.0. The adapter uses Strata's interleaved Q8_1 slots.

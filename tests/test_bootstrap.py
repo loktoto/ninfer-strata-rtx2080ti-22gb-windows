@@ -33,7 +33,7 @@ class PatchSeriesTests(unittest.TestCase):
         for index, new in enumerate(("first\nchanged\nthird\n", "new-first\nchanged\nthird\n")):
             patch = self.root / f"{index}.patch"
             patch.write_text("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True),
-                                                        fromfile="a/main.cpp", tofile="b/main.cpp")))
+                                                        fromfile="a/main.cpp", tofile="b/main.cpp")), newline="\n")
             self.patches.append(patch)
             old = new
 
@@ -68,3 +68,4 @@ class PatchSeriesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

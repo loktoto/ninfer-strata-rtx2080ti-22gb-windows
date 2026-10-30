@@ -1,0 +1,41 @@
+{
+  "exe": "D:\\AI\\ninfer-strata-test\\build-windows\\strata\\strata-poly.exe",
+  "args": [
+    "--model",
+    "D:\\AI\\LLM\\models\\sage\\Sage-A1.5-IQ4_XS-exps.gguf",
+    "--tail-skip",
+    "0",
+    "--skip-weight",
+    "0",
+    "--no-draft",
+    "--lookup",
+    "0",
+    "--window",
+    "1",
+    "--kv",
+    "fp16",
+    "--max-context",
+    "32768",
+    "--threads",
+    "16"
+  ],
+  "cwd": "D:\\AI\\ninfer-strata-test\\.deps\\PolyStrata",
+  "tokenizer": "D:\\AI\\ninfer-strata-test\\comparison-strata-native\\pack\\tokenizer",
+  "model_name": "sage-a1.5",
+  "arch": "qwen35moe",
+  "backend": "cuda",
+  "host": "127.0.0.1",
+  "port": 18106,
+  "fit_max_tokens": false,
+  "drop_oldest": false,
+  "env": {
+    "STRATA_ROUTE_TAIL_SKIP": "0",
+    "STRATA_FREEZE_EXPERTS": "1",
+    "STRATA_SAGE_RMSNORM": "0",
+    "STRATA_SAGE_EXPERT_Q4K": "0",
+    "STRATA_SAGE_EXPERT_Q6K": "0",
+    "STRATA_SAGE_EXPERT_IQ4XS": "1",
+    "STRATA_SAGE_TRACE": "1"
+  },
+  "log": "D:\\AI\\ninfer-strata-test\\evidence\\iq4xs-20261029\\iq4xs-expert-graphs-engine.log"
+}

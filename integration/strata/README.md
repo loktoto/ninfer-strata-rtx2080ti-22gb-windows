@@ -41,3 +41,15 @@ existing Q8_1 scratch/output pointers and stream. Q6_K, unsupported shapes and
 all-cached device-ID routing retain native dispatch. No expert bank is created.
 This candidate requires SM75 numerical and same-GGUF validation before use in
 a performance profile; CPU and GPU expert partitioning remain Strata's.
+
+
+## Experimental IQ4_XS experts
+
+For a diagnostic run, use `--ninfer-expert-iq4xs` with `launch_strict.py` or
+`tools/serve_sage.py`; default is off. This enables the cached GPU expert slot
+products for GGUF IQ4_XS, leaving other types and CPU experts on Strata. For
+graph-enabled comparison use the environment variable `STRATA_SAGE_EXPERT_IQ4XS=1`
+with a non-strict launch. The strict launcher disables graphs and draft tokens.
+`STRATA_SAGE_TRACE=1` additionally enables one-time host and device diagnostics;
+the device diagnostic writes to stdout, so do not enable it in production.
+See [test results](../../docs/IQ4XS_EXPERT_INTEGRATION_2026-10-30.md).
