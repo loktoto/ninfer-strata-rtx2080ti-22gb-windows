@@ -1,0 +1,221 @@
+{
+  "arithmetic": {
+    "native": {
+      "decode_samples": [
+        107.4,
+        107.9,
+        107.8,
+        108.0
+      ],
+      "decode_median": 107.85,
+      "prompt_samples": [
+        361.6,
+        359.1,
+        369.8,
+        333.3
+      ],
+      "prompt_median": 360.35,
+      "completion_tokens": [
+        240,
+        240,
+        240,
+        240
+      ],
+      "prompt_tokens": [
+        52,
+        52,
+        52,
+        52
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "candidate": {
+      "decode_samples": [
+        115.1,
+        114.9,
+        114.6,
+        115.1
+      ],
+      "decode_median": 115.0,
+      "prompt_samples": [
+        361.4,
+        309.5,
+        341.0,
+        380.7
+      ],
+      "prompt_median": 351.2,
+      "completion_tokens": [
+        240,
+        240,
+        240,
+        240
+      ],
+      "prompt_tokens": [
+        52,
+        52,
+        52,
+        52
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "decode_percent_change": 6.629578117756152,
+    "prompt_percent_change": -2.5391980019425664,
+    "all_content_and_reasoning_identical": true
+  },
+  "python": {
+    "native": {
+      "decode_samples": [
+        108.5,
+        108.7,
+        108.3,
+        108.9
+      ],
+      "decode_median": 108.6,
+      "prompt_samples": [
+        270.4,
+        294.3,
+        302.8,
+        305.9
+      ],
+      "prompt_median": 298.55,
+      "completion_tokens": [
+        110,
+        110,
+        110,
+        110
+      ],
+      "prompt_tokens": [
+        42,
+        42,
+        42,
+        42
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "candidate": {
+      "decode_samples": [
+        115.9,
+        115.3,
+        116.0,
+        116.0
+      ],
+      "decode_median": 115.95,
+      "prompt_samples": [
+        308.8,
+        263.7,
+        272.4,
+        313.0
+      ],
+      "prompt_median": 290.6,
+      "completion_tokens": [
+        110,
+        110,
+        110,
+        110
+      ],
+      "prompt_tokens": [
+        42,
+        42,
+        42,
+        42
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "decode_percent_change": 6.767955801104986,
+    "prompt_percent_change": -2.6628705409479148,
+    "all_content_and_reasoning_identical": true
+  },
+  "retrieval": {
+    "native": {
+      "decode_samples": [
+        118.0,
+        120.5,
+        114.1,
+        118.9
+      ],
+      "decode_median": 118.45,
+      "prompt_samples": [
+        2252.9,
+        2190.2,
+        2224.6,
+        2242.7
+      ],
+      "prompt_median": 2233.6499999999996,
+      "completion_tokens": [
+        9,
+        9,
+        9,
+        9
+      ],
+      "prompt_tokens": [
+        1133,
+        1133,
+        1133,
+        1133
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "candidate": {
+      "decode_samples": [
+        125.5,
+        126.8,
+        126.2,
+        126.2
+      ],
+      "decode_median": 126.2,
+      "prompt_samples": [
+        2198.3,
+        2229.0,
+        2170.9,
+        2253.4
+      ],
+      "prompt_median": 2213.65,
+      "completion_tokens": [
+        9,
+        9,
+        9,
+        9
+      ],
+      "prompt_tokens": [
+        1133,
+        1133,
+        1133,
+        1133
+      ],
+      "cached_tokens": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "decode_percent_change": 6.54284508231322,
+    "prompt_percent_change": -0.8953954290063182,
+    "all_content_and_reasoning_identical": true
+  }
+}

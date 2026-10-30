@@ -1,0 +1,448 @@
+{
+  "schema_version": 1,
+  "C": {
+    "status": "not_measured",
+    "reason": "Exact Sage GGUF-to-NInfer artifact import and standalone runtime not qualified."
+  },
+  "excluded_runs": {
+    "1-A": "Prompt-prefix caching enabled; superseded by cache-disabled controls."
+  },
+  "order": [
+    "1-A-excluded",
+    "2-B",
+    "3-D",
+    "4-D",
+    "5-B",
+    "6-A",
+    "7-A"
+  ],
+  "variants": {
+    "A": {
+      "runs": [
+        "6-A",
+        "7-A"
+      ],
+      "cases": {
+        "arithmetic": {
+          "decode_samples_tok_s": [
+            95.36292776158469,
+            95.17786712373281,
+            95.28415209264331,
+            95.56383864345733
+          ],
+          "prefill_samples_tok_s": [
+            441.0891509033845,
+            495.9513204703907,
+            461.83223056085967,
+            469.94179951559846
+          ],
+          "ttft_samples_s": [
+            0.24994780000270111,
+            0.19861390000005485,
+            0.22237760000280105,
+            0.21032459999696584
+          ],
+          "prompt_tokens": [
+            52,
+            52,
+            52,
+            52
+          ],
+          "completion_tokens": [
+            240,
+            240,
+            240,
+            240
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 95.323539927114,
+          "prefill_median_tok_s": 465.88701503822904,
+          "ttft_median_s": 0.21635109999988344
+        },
+        "python": {
+          "decode_samples_tok_s": [
+            92.44958317112248,
+            96.09687976076286,
+            92.97025463614513,
+            96.367902592385
+          ],
+          "prefill_samples_tok_s": [
+            318.41097759751335,
+            417.0224596381834,
+            301.2717973731969,
+            425.36383799714395
+          ],
+          "ttft_samples_s": [
+            0.18108480000228155,
+            0.14013189999968745,
+            0.16693410000152653,
+            0.12191890000394778
+          ],
+          "prompt_tokens": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "completion_tokens": [
+            110,
+            110,
+            110,
+            110
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 94.533567198454,
+          "prefill_median_tok_s": 367.7167186178484,
+          "ttft_median_s": 0.153533000000607
+        },
+        "retrieval": {
+          "decode_samples_tok_s": [
+            65.21242948906061,
+            83.23449237363964,
+            74.72654754009547,
+            83.82844508712918
+          ],
+          "prefill_samples_tok_s": [
+            920.5297636602797,
+            931.3535699283769,
+            936.9281161956253,
+            938.2082623604591
+          ],
+          "ttft_samples_s": [
+            1.3522852000023704,
+            1.3008227000027546,
+            1.2715688000025693,
+            1.2676878999991459
+          ],
+          "prompt_tokens": [
+            1133,
+            1133,
+            1133,
+            1133
+          ],
+          "completion_tokens": [
+            9,
+            9,
+            9,
+            9
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 78.98051995686755,
+          "prefill_median_tok_s": 934.1408430620011,
+          "ttft_median_s": 1.286195750002662
+        }
+      }
+    },
+    "B": {
+      "runs": [
+        "2-B",
+        "5-B"
+      ],
+      "cases": {
+        "arithmetic": {
+          "decode_samples_tok_s": [
+            108.0,
+            107.5,
+            108.1,
+            107.9
+          ],
+          "prefill_samples_tok_s": [
+            369.6,
+            365.9,
+            363.4,
+            370.6
+          ],
+          "ttft_samples_s": [
+            0.16445079999539303,
+            0.15340320000541396,
+            0.14527559999987716,
+            0.1558244999978342
+          ],
+          "prompt_tokens": [
+            52,
+            52,
+            52,
+            52
+          ],
+          "completion_tokens": [
+            240,
+            240,
+            240,
+            240
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 107.95,
+          "prefill_median_tok_s": 367.75,
+          "ttft_median_s": 0.1546138500016241
+        },
+        "python": {
+          "decode_samples_tok_s": [
+            108.1,
+            108.5,
+            108.5,
+            108.6
+          ],
+          "prefill_samples_tok_s": [
+            297.7,
+            270.4,
+            295.6,
+            302.2
+          ],
+          "ttft_samples_s": [
+            0.1636235999976634,
+            0.15781730000162497,
+            0.16895020000083605,
+            0.1600620000026538
+          ],
+          "prompt_tokens": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "completion_tokens": [
+            110,
+            110,
+            110,
+            110
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 108.5,
+          "prefill_median_tok_s": 296.65,
+          "ttft_median_s": 0.1618428000001586
+        },
+        "retrieval": {
+          "decode_samples_tok_s": [
+            118.6,
+            117.3,
+            117.2,
+            111.1
+          ],
+          "prefill_samples_tok_s": [
+            2210.3,
+            2183.0,
+            2235.6,
+            2194.5
+          ],
+          "ttft_samples_s": [
+            0.5304756999976235,
+            0.5329606999948737,
+            0.5302005999983521,
+            0.5191972000029637
+          ],
+          "prompt_tokens": [
+            1133,
+            1133,
+            1133,
+            1133
+          ],
+          "completion_tokens": [
+            9,
+            9,
+            9,
+            9
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 117.25,
+          "prefill_median_tok_s": 2202.4,
+          "ttft_median_s": 0.5303381499979878
+        }
+      }
+    },
+    "D": {
+      "runs": [
+        "3-D",
+        "4-D"
+      ],
+      "cases": {
+        "arithmetic": {
+          "decode_samples_tok_s": [
+            115.2,
+            115.2,
+            114.8,
+            115.0
+          ],
+          "prefill_samples_tok_s": [
+            364.7,
+            366.2,
+            353.0,
+            369.3
+          ],
+          "ttft_samples_s": [
+            0.1605347999939113,
+            0.1559800999966683,
+            0.1498379999975441,
+            0.16620800000237068
+          ],
+          "prompt_tokens": [
+            52,
+            52,
+            52,
+            52
+          ],
+          "completion_tokens": [
+            240,
+            240,
+            240,
+            240
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 115.1,
+          "prefill_median_tok_s": 365.45,
+          "ttft_median_s": 0.1582574499952898
+        },
+        "python": {
+          "decode_samples_tok_s": [
+            116.2,
+            115.8,
+            115.9,
+            115.9
+          ],
+          "prefill_samples_tok_s": [
+            312.5,
+            292.9,
+            281.3,
+            299.4
+          ],
+          "ttft_samples_s": [
+            0.16155720000097062,
+            0.1618049999960931,
+            0.1650320000044303,
+            0.1521123999991687
+          ],
+          "prompt_tokens": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "completion_tokens": [
+            110,
+            110,
+            110,
+            110
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 115.9,
+          "prefill_median_tok_s": 296.15,
+          "ttft_median_s": 0.16168109999853186
+        },
+        "retrieval": {
+          "decode_samples_tok_s": [
+            127.8,
+            125.9,
+            128.4,
+            127.3
+          ],
+          "prefill_samples_tok_s": [
+            2248.5,
+            2234.3,
+            2171.7,
+            2242.7
+          ],
+          "ttft_samples_s": [
+            0.5178738999966299,
+            0.5296557000037865,
+            0.5356912000061129,
+            0.5082059999986086
+          ],
+          "prompt_tokens": [
+            1133,
+            1133,
+            1133,
+            1133
+          ],
+          "completion_tokens": [
+            9,
+            9,
+            9,
+            9
+          ],
+          "cached_tokens": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "decode_median_tok_s": 127.55,
+          "prefill_median_tok_s": 2238.5,
+          "ttft_median_s": 0.5237648000002082
+        }
+      }
+    }
+  },
+  "exact_text_agreement": {
+    "arithmetic": {
+      "AB": true,
+      "AD": true,
+      "BD": true
+    },
+    "python": {
+      "AB": true,
+      "AD": true,
+      "BD": true
+    },
+    "retrieval": {
+      "AB": true,
+      "AD": true,
+      "BD": true
+    }
+  },
+  "decode_percent_change": {
+    "arithmetic": {
+      "AB": 13.245899263225436,
+      "AD": 20.746669802660932,
+      "BD": 6.623436776285319
+    },
+    "python": {
+      "AB": 14.774046103884263,
+      "AD": 22.6019533957621,
+      "BD": 6.820276497695854
+    },
+    "retrieval": {
+      "AB": 48.45432780644137,
+      "AD": 61.495518223553056,
+      "BD": 8.78464818763327
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "iq4xs-20261029": {
+    "selected_source_files": 19,
+    "already_on_github": [
+      "evidence/iq4xs-20261029/iq4xs-expert-graphs-comparison.json",
+      "evidence/iq4xs-20261029/unsandboxed-1-nographs-comparison.json",
+      "evidence/iq4xs-20261029/unsandboxed-2-graphs-comparison.json",
+      "evidence/iq4xs-20261029/unsandboxed-3-graphs-comparison.json",
+      "evidence/iq4xs-20261029/unsandboxed-4-nographs-comparison.json",
+      "evidence/iq4xs-20261029/unsandboxed-5-rms-graphs-comparison.json"
+    ],
+    "previously_local_only": [
+      "evidence/iq4xs-20261029/llama-comparison.json",
+      "evidence/iq4xs-20261029/llama-long.json",
+      "evidence/iq4xs-20261029/llama-mtp4-comparison.json",
+      "evidence/iq4xs-20261029/llama-mtp4-long.json",
+      "evidence/iq4xs-20261029/llama-no-graphs-comparison.json",
+      "evidence/iq4xs-20261029/llama-no-graphs-long.json",
+      "evidence/iq4xs-20261029/llama-no-graphs-quality.json",
+      "evidence/iq4xs-20261029/strata-native-comparison.json",
+      "evidence/iq4xs-20261029/strata-native-long.json",
+      "evidence/iq4xs-20261029/strata-native-quality.json",
+      "evidence/iq4xs-20261029/strata-rmsnorm-comparison.json",
+      "evidence/iq4xs-20261029/strata-rmsnorm-long.json",
+      "evidence/iq4xs-20261029/strata-rmsnorm-quality.json"
+    ]
+  },
+  "iq4xs-optimization-20261030": {
+    "selected_source_files": 4,
+    "already_on_github": [],
+    "previously_local_only": [
+      "evidence/iq4xs-optimization-20261030/optimized-1-native-comparison.json",
+      "evidence/iq4xs-optimization-20261030/optimized-2-candidate-comparison.json",
+      "evidence/iq4xs-optimization-20261030/optimized-3-candidate-comparison.json",
+      "evidence/iq4xs-optimization-20261030/optimized-4-native-comparison.json"
+    ]
+  }
+}
