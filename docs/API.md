@@ -5,9 +5,10 @@
 `--serve` stdin/stdout protocol. The NInfer-derived candidates run inside that
 same process when selected.
 
-This startup path has host tests. A successful Windows Sage model load, API
-response, GPU numerical qualification and 256K context acceptance are still
-pending; commands below are the procedure to verify them on the target PC.
+This startup path has host tests. The IQ4_XS model has completed bounded Windows
+API, GPU-oracle and full-logit comparisons; see [methodology and results](METHODOLOGY_AND_RESULTS.md).
+This does not qualify every model, workload or context size. No 256K acceptance
+is claimed. The original Q4_K_M identity below is distinct from the tested IQ4_XS artifact.
 
 ## Prepare the runtime and Python packages
 
@@ -72,7 +73,8 @@ starts the executable.
 Baseline engine arguments are `--tail-skip 0 --skip-weight 0 --no-draft --lookup 0
 --window 1 --no-graphs --kv fp16 --max-context 8192`. The environment explicitly
 sets `STRATA_ROUTE_TAIL_SKIP=0`, `STRATA_FREEZE_EXPERTS=1`,
-`STRATA_SAGE_RMSNORM=0` and `STRATA_SAGE_EXPERT_Q4K=0`, overriding inherited
+`STRATA_SAGE_TRACE=0`, `STRATA_SAGE_RMSNORM=0`, `STRATA_SAGE_EXPERT_Q4K=0`,
+`STRATA_SAGE_EXPERT_Q6K=0` and `STRATA_SAGE_EXPERT_IQ4XS=0`, overriding inherited
 candidate settings. These values are also saved in the config for later starts.
 Use `--max-context N` and `--threads N` to select a positive context allocation
 and CPU thread count. Larger allocations require separate memory and correctness
@@ -128,7 +130,38 @@ python tools/serve_sage.py --engine .\build-windows\strata\strata-poly.exe --mod
 Real startup is Windows-only. Linux can use local Linux-style paths with
 `--dry-run`; it cannot validate the existence of a Windows drive path.
 
-Add `--ninfer-rmsnorm`, `--ninfer-expert-q4k` and/or `--ninfer-expert-q6k` to select the experimental
+Add `--ninfer-rmsnorm`, `--ninfer-expert-q4k`, `--ninfer-expert-q6k` and/or
+`--ninfer-expert-iq4xs` to select the experimental
 candidates explicitly. Each flag controls its own saved environment value.
 Use a new output directory and compare against the same prompt and strict
 baseline before claiming numerical equivalence or a performance gain.
+
+## Reproduce the graph and draft profiles
+
+The default is a diagnostic profile with graphs and drafting disabled. Add
+`--cuda-graphs` for the measured graph-eligible no-draft profile. Add
+`--draft-window 4` as well to use the model's own draft block with a verification
+window containing one known token and up to three guesses. It is not four draft
+tokens. The explicit draft option requires `--cuda-graphs`, accepts windows 2–4,
+and keeps lookup disabled, FP16 KV and complete expert routing. Graph eligibility
+does not by itself prove every call is captured.
+
+For the supplied IQ4_XS model, use a new output directory and the built executable:
+
+```powershell
+python tools/serve_sage.py --engine .\build-optimized\strata\strata-poly.exe --model $SageModel --max-context 32768 --threads 16 --cuda-graphs --draft-window 4 --ninfer-expert-iq4xs --output-dir .\sage-iq4xs-draft
+```
+
+Set `$SageModel` to the actual local GGUF beforehand. Omit `--draft-window 4` for
+the no-draft comparison; omit `--ninfer-expert-iq4xs` for native Strata with the
+same decoding settings. Leave RMSNorm off: its full-model numerical differences
+remain unresolved. See the [draft study](IQ4XS_MTP_RESULTS_2026-10-30.md) for
+measured rates, acceptance and limitations. Allocating 32768 tokens does not mean
+these short workloads occupied that context.
+
+The launcher now persists the IQ4_XS selection and trace setting in saved configs.
+Previously the initial process received the IQ4_XS selection, but the saved JSON
+omitted it; restarting that JSON could inherit the opposite setting from another
+shell. Regenerate old configs to make the saved choice explicit. The reported
+benchmarks used explicit per-run configs and were not affected by this omission.
+

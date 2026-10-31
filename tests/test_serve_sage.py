@@ -97,7 +97,9 @@ class ServeSageTests(unittest.TestCase):
         self.assertEqual(cfg["port"], 8080)
         self.assertEqual(cfg["model_name"], "sage-a1.5")
         self.assertEqual(cfg["env"], {"STRATA_ROUTE_TAIL_SKIP": "0", "STRATA_FREEZE_EXPERTS": "1",
-                                      "STRATA_SAGE_RMSNORM": "0", "STRATA_SAGE_EXPERT_Q4K": "0", "STRATA_SAGE_EXPERT_Q6K": "0"})
+                                      "STRATA_SAGE_TRACE": "0", "STRATA_SAGE_RMSNORM": "0",
+                                      "STRATA_SAGE_EXPERT_Q4K": "0", "STRATA_SAGE_EXPERT_Q6K": "0",
+                                      "STRATA_SAGE_EXPERT_IQ4XS": "0"})
         for _, kwargs in self.calls[1:]:
             for key, value in cfg["env"].items():
                 self.assertEqual(kwargs["env"][key], value)
@@ -119,6 +121,42 @@ class ServeSageTests(unittest.TestCase):
         self.invoke("--ninfer-expert-q4k")
         self.assertEqual(self.config()["env"]["STRATA_SAGE_EXPERT_Q4K"], "1")
         self.assertEqual(self.config()["env"]["STRATA_SAGE_RMSNORM"], "0")
+
+    def test_saved_iq4xs_selection_overrides_restart_environment(self):
+        for selected in (False, True):
+            with self.subTest(selected=selected):
+                self.output = self.root / ("candidate" if selected else "baseline")
+                self.argv[self.argv.index("--output-dir") + 1] = str(self.output)
+                with mock.patch.dict(os.environ, {"STRATA_SAGE_EXPERT_IQ4XS": "1" if not selected else "0",
+                                                  "STRATA_SAGE_TRACE": "1"}):
+                    self.invoke(*(["--ninfer-expert-iq4xs"] if selected else []))
+                # The saved config is the authority when the server is restarted
+                # from a different shell, as well as on this initial launch.
+                restarted_env = {"STRATA_SAGE_EXPERT_IQ4XS": "1" if not selected else "0",
+                                 "STRATA_SAGE_TRACE": "1"}
+                restarted_env.update(self.config()["env"])
+                self.assertEqual(restarted_env["STRATA_SAGE_EXPERT_IQ4XS"], "1" if selected else "0")
+                self.assertEqual(restarted_env["STRATA_SAGE_TRACE"], "0")
+                self.assertEqual(self.calls[-1][1]["env"]["STRATA_SAGE_EXPERT_IQ4XS"],
+                                 restarted_env["STRATA_SAGE_EXPERT_IQ4XS"])
+
+    def test_graph_profile_preserves_non_speculative_routing(self):
+        self.invoke("--cuda-graphs")
+        args = self.config()["args"]
+        self.assertNotIn("--no-graphs", args)
+        self.assertIn("--no-draft", args)
+        self.assertEqual(args[args.index("--window") + 1], "1")
+        self.assertEqual(args[args.index("--lookup") + 1], "0")
+
+    def test_experimental_draft_profile_saves_exact_window(self):
+        self.invoke("--cuda-graphs", "--draft-window", "4", "--ninfer-expert-iq4xs")
+        args = self.config()["args"]
+        self.assertNotIn("--no-graphs", args)
+        self.assertNotIn("--no-draft", args)
+        self.assertEqual(args[args.index("--window") + 1], "4")
+        self.assertEqual(args[args.index("--lookup") + 1], "0")
+        self.assertEqual(args[args.index("--kv") + 1], "fp16")
+        self.assertEqual(self.config()["env"]["STRATA_SAGE_EXPERT_IQ4XS"], "1")
 
     def test_dry_run_reads_pin_but_does_not_write_extract_or_launch(self):
         code, output = self.invoke("--dry-run", system="Linux")
@@ -192,6 +230,7 @@ class ServeSageTests(unittest.TestCase):
 
     def test_cli_rejects_conflicting_options_and_invalid_context(self):
         for extra in (["--max-context", "0"], ["--threads", "-1"], ["--fit-max-tokens"],
+                      ["--draft-window", "4"], ["--cuda-graphs", "--draft-window", "5"],
                       ["--host", "0.0.0.0"], ["--", "--kv", "q8_0"]):
             with self.subTest(extra=extra):
                 run = subprocess.run([sys.executable, str(TOOL), *self.argv, "--dry-run", *extra],
@@ -202,3 +241,4 @@ class ServeSageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

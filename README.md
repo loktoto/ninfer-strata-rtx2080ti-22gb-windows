@@ -1,6 +1,6 @@
 # Sage-A1.5 Windows Unified Engine
 
-One Strata-owned runtime for Sage-A1.5 Q4_K_M on Windows 11 x64 and the
+One Strata-owned runtime for Sage-A1.5 GGUF on Windows 11 x64 and the
 RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
 **Development implementation; hardware acceptance is pending.** This repository
@@ -10,15 +10,23 @@ does not yet provide a qualified Windows executable. Bounded on-device throughpu
 by the project owner; it is not a dependency of this release. Preserve its
 research for a later phase. See the [active roadmap](docs/ROADMAP.md).
 
-The owner's current test target is **Sage-A1.5 IQ4_XS, MTP4, 32K configured
-capacity**. Read [IQ4_XS testing readiness](docs/IQ4XS_TESTING.md) before testing:
-current strict launchers disable MTP and the original Q4_K_M model lock cannot
-qualify a different IQ4_XS file. The IQ4_XS expert candidate has a local GPU and model test; a matched
-IQ4_XS/MTP4 performance comparison is not yet prepared. See [IQ4_XS expert integration](docs/IQ4XS_EXPERT_INTEGRATION_2026-10-30.md).
+The current measured target is **Sage-A1.5 IQ4_XS, 32K configured capacity**.
+The original Q4_K_M model lock cannot qualify a different IQ4_XS file.
+The IQ4_XS expert candidate has GPU-oracle and full-model checks; the separate
+[draft-window study](docs/IQ4XS_MTP_RESULTS_2026-10-30.md) tests one known token
+plus up to three MTP guesses. See [API startup](docs/API.md) for explicit graph
+and draft options; default diagnostic launchers still disable both.
 
 ## Methodology, achievements, and A/B/C/D evidence
 
 Start with [how we built and tested the integration](docs/METHODOLOGY_AND_RESULTS.md), the [A/B/C/D comparison](docs/ABCD_COMPARISON_2026-10-30.md), and the [evidence recovery audit](docs/EVIDENCE_AUDIT_2026-10-30.md). The audit restores numeric datasets that were present locally but missing from GitHub, while retaining failed and superseded experiments. A is Sage through llama.cpp, B native Strata, C standalone NInfer (not yet measured with this exact model), and D the combined Strata/NInfer-derived expert path. Graph-option gains are reported separately from NInfer kernel gains.
+
+The [NInfer report review](docs/NINFER_UPLIFT_REPORTS_2026-10-30.md) explains the
+conditions behind published large gains. The [existing Sage Strata research](docs/STRATA_SAGE_RESEARCH_2026-10-30.md)
+identifies a separate Sage fork, its benchmark conditions, and Windows/SM75 applicability.
+The [October 31 snapshot index](docs/EVIDENCE_SNAPSHOT_2026-10-31.md) accounts for
+the preserved raw evidence, while [standalone NInfer progress](docs/NINFER_STANDALONE_PROGRESS_2026-10-31.md)
+records the tested CPU import work and remaining C-runtime work.
 
 ## What is implemented
 

@@ -189,15 +189,15 @@ double run_ids_case(int ni,int no,int count,int x_every) {
     Stream stream; auto st=stream.stream; const size_t wb=size_t(ni/256)*no*136, xb=size_t(ni/32)*36;
     const size_t x_stride=xb+16, y_stride=size_t(no)+4;
     std::vector<Fixture> f; f.reserve(count);
-    std::array<std::unique_ptr<Allocation>,8> dw; const void* host_table[8]{}; int host_ids[8]{};
+    std::vector<std::unique_ptr<Allocation>> dw(count); std::vector<const void*> host_table(count); std::vector<int> host_ids(count);
     for(int j=0;j<count;++j) {
         f.emplace_back(ni,no,j,2); const int idx=count-1-j; host_ids[j]=idx;
         dw[idx]=std::make_unique<Allocation>(wb+16);host_table[idx]=dw[idx]->pointer;
         check(cudaMemcpyAsync(static_cast<std::uint8_t*>(dw[idx]->pointer)+16,f[j].w.data(),wb,cudaMemcpyHostToDevice,st));
     }
     Allocation table(count*sizeof(void*)), ids(count*sizeof(int)), x(count*x_stride), y(count*y_stride*sizeof(float));
-    check(cudaMemcpyAsync(table.pointer,host_table,count*sizeof(void*),cudaMemcpyHostToDevice,st));
-    check(cudaMemcpyAsync(ids.pointer,host_ids,count*sizeof(int),cudaMemcpyHostToDevice,st));
+    check(cudaMemcpyAsync(table.pointer,host_table.data(),count*sizeof(void*),cudaMemcpyHostToDevice,st));
+    check(cudaMemcpyAsync(ids.pointer,host_ids.data(),count*sizeof(int),cudaMemcpyHostToDevice,st));
     for(int j=0;j<count/x_every+(count%x_every!=0);++j)
         check(cudaMemcpyAsync(static_cast<std::uint8_t*>(x.pointer)+j*x_stride,f[j].x.data(),xb,cudaMemcpyHostToDevice,st));
     std::vector<float> out(count*y_stride,123456.f);
@@ -266,7 +266,7 @@ int main() {
         maximum_error = std::max(maximum_error, run_case(512, 2048, 8, 0, true, false));
         maximum_error = std::max(maximum_error, run_case(2048, 1024, 8, 0, false, false));
         cases += 2;
-        for(int ni : {512,2048}) for(int count : {1,3,8}) for(int every : {1,2}) {
+        for(int ni : {512,2048}) for(int count : {1,3,8,32}) for(int every : {1,2,8}) {
             maximum_error=std::max(maximum_error,run_ids_case(ni,ni==512?2048:1024,count,every)); ++cases;
         }
         std::cout << "PASS iq4xs_slots_cases=" << cases << " max_abs_error=" << maximum_error

@@ -1,0 +1,301 @@
+diff --git a/tools/convert/sage_gguf_experts.py b/tools/convert/sage_gguf_experts.py
+new file mode 100644
+--- /dev/null
++++ b/tools/convert/sage_gguf_experts.py
+@@ -0,0 +1,30 @@
++"""Experimental Qwen3.5 MoE GGUF expert source bindings.
++
++This module preserves IQ4_XS block rows. It is deliberately not registered as a
++complete conversion recipe: Qwen's GGUF MoE runtime and non-expert mappings still
++need implementation and qualification.
++"""
++from .gguf_blocks import block_source
++from .ternary import rows
++
++EXPERTS = 256
++HIDDEN = 2048
++WIDTH = 512
++LAYERS = 40
++IQ4_XS = 23
++
++
++def expert_sources(gguf, layer: int, expert: int):
++    """Return per-projection LogicalSources for one expert without requantization."""
++    if not 0 <= layer < LAYERS or not 0 <= expert < EXPERTS:
++        raise ValueError('layer or expert outside Sage text tower')
++    sources = {}
++    for role in ('gate', 'up', 'down'):
++        name = f'blk.{layer}.ffn_{role}_exps.weight'
++        row_count, columns = ((HIDDEN, WIDTH) if role == 'down' else (WIDTH, HIDDEN))
++        info = gguf.info(name)
++        if info.type_id != IQ4_XS or info.shape != (EXPERTS, row_count, columns):
++            raise ValueError(f'{name}: expected IQ4_XS expert-major Sage geometry')
++        sources[role] = block_source(gguf, name, (row_count, columns),
++                                     rows(expert * row_count))
++    return sources
+diff --git a/tools/convert/sage_iq4xs_oracle.py b/tools/convert/sage_iq4xs_oracle.py
+new file mode 100644
+--- /dev/null
++++ b/tools/convert/sage_iq4xs_oracle.py
+@@ -0,0 +1,58 @@
++"""Independent FP64 IQ4_XS block decoder for Sage expert numerical qualification.
++
++Inputs are rows of ggml IQ4_XS blocks, 136 bytes per 256 weights. This is an
++oracle for represented values; it does not model q8_1 activation rounding,
++BF16 intermediate storage, routing or graph execution.
++"""
++import numpy as np
++
++_CODEBOOK = np.array([-127, -104, -83, -65, -49, -35, -22, -10,
++                       1, 13, 25, 38, 53, 69, 89, 113], dtype=np.float64)
++
++
++def decode_iq4_xs(raw):
++    raw = np.asarray(raw, dtype=np.uint8)
++    if raw.ndim != 2 or not raw.shape[0] or not raw.shape[1] or raw.shape[1] % 136:
++        raise ValueError('expected nonempty rows of complete 136-byte IQ4_XS blocks')
++    n = raw.shape[0]
++    blocks = np.ascontiguousarray(raw).reshape(n, -1, 136)
++    d = blocks[..., :2].copy().view('<f2').astype(np.float64)
++    high = blocks[..., 2:4].copy().view('<u2').astype(np.uint16)
++    lows = blocks[..., 4:8]
++    codes = blocks[..., 8:].reshape(n, -1, 8, 16)
++    sub = np.arange(8, dtype=np.uint16)
++    ls = ((lows[..., sub // 2] >> (4 * (sub % 2))) & 15).astype(np.uint16)
++    ls |= ((high >> (2 * sub)) & 3) << 4
++    scale = d * (ls.astype(np.float64) - 32)
++    lo = _CODEBOOK[codes & 15]
++    hi = _CODEBOOK[codes >> 4]
++    values = np.concatenate((lo, hi), axis=-1) * scale[..., None]
++    return values.reshape(n, -1)
++
++
++def expert_product(x, gate, up, down):
++    """Evaluate one expert in FP64 from already-decoded represented weights."""
++    x = np.asarray(x, dtype=np.float64)
++    gate = np.asarray(gate, dtype=np.float64)
++    up = np.asarray(up, dtype=np.float64)
++    down = np.asarray(down, dtype=np.float64)
++    if x.ndim != 1 or gate.ndim != 2 or up.shape != gate.shape or gate.shape[1] != x.size or down.shape != (x.size, gate.shape[0]):
++        raise ValueError('expert dimensions do not match')
++    g = gate @ x
++    # Stable sigmoid, including large negative inputs.
++    silu = g * np.exp(-np.logaddexp(0.0, -g))
++    return down @ (silu * (up @ x))
++
++
++def routed_sum(x, experts, ids, weights, shared, shared_weight):
++    """Weighted selected experts plus one shared expert, all mathematics FP64.
++
++    `experts` maps ids to (gate, up, down) decoded matrices. The router's
++    selection and weights must be independently computed and passed in.
++    """
++    if len(ids) != len(weights) or not len(ids):
++        raise ValueError('ids and weights must have the same nonzero length')
++    out = np.zeros_like(np.asarray(x, dtype=np.float64))
++    for expert, weight in zip(ids, weights):
++        out += float(weight) * expert_product(x, *experts[expert])
++    return out + float(shared_weight) * expert_product(x, *shared)
+diff --git a/tools/convert/verify_sage_expert_rows.py b/tools/convert/verify_sage_expert_rows.py
+new file mode 100644
+--- /dev/null
++++ b/tools/convert/verify_sage_expert_rows.py
+@@ -0,0 +1,51 @@
++"""Inspect exact Sage IQ4_XS expert row bindings; this is not an artifact converter.
++
++Checks the pinned NInfer GGUF reader's expert-major row mapping against independent file-offset
++reads without decoding or changing weights. No GPU is used. Supply an explicit GGUF path.
++"""
++import argparse
++from pathlib import Path
++import sys
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
++from tools.convert.sources.gguf import GGUFFile
++
++LAYERS, EXPERTS, HIDDEN, WIDTH = 40, 256, 2048, 512
++
++def mapping(role, expert, row):
++    if role not in ('gate', 'up', 'down') or not 0 <= expert < EXPERTS:
++        raise ValueError('invalid expert or projection')
++    rows = HIDDEN if role == 'down' else WIDTH
++    columns = WIDTH if role == 'down' else HIDDEN
++    if not 0 <= row < rows:
++        raise ValueError('row outside expert')
++    return expert * rows + row, columns // 256 * 136
++
++def verify(path):
++    count = 0
++    with GGUFFile(path) as gguf, Path(path).open('rb') as raw:
++        if gguf.kv.get('general.architecture') != 'qwen35moe':
++            raise ValueError('expected qwen35moe')
++        for layer in range(LAYERS):
++            for role in ('gate', 'up', 'down'):
++                name = f'blk.{layer}.ffn_{role}_exps.weight'
++                info = gguf.info(name)
++                rows = HIDDEN if role == 'down' else WIDTH
++                columns = WIDTH if role == 'down' else HIDDEN
++                if info.type_id != 23 or info.shape != (EXPERTS, rows, columns):
++                    raise ValueError(f'{name}: unexpected type or geometry')
++                for expert in (0, 1, 127, 255):
++                    for row in (0, rows - 1):
++                        index, row_bytes = mapping(role, expert, row)
++                        actual = gguf.read_blocks(name, index, index + 1).tobytes()
++                        raw.seek(gguf.data_offset + info.offset + index * row_bytes)
++                        expected = raw.read(row_bytes)
++                        if len(expected) != row_bytes or actual != expected:
++                            raise AssertionError(f'{name}: expert {expert}, row {row}')
++                        count += 1
++    return count
++
++if __name__ == '__main__':
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('gguf', type=Path)
++    print(f'PASS: {verify(parser.parse_args().gguf)} expert boundary rows match raw bytes')
+diff --git a/tests/convert/test_sage_gguf_experts.py b/tests/convert/test_sage_gguf_experts.py
+new file mode 100644
+--- /dev/null
++++ b/tests/convert/test_sage_gguf_experts.py
+@@ -0,0 +1,84 @@
++import unittest
++import numpy as np
++from types import SimpleNamespace
++from tools.convert.sage_gguf_experts import expert_sources
++
++class Fixture:
++    def info(self, name):
++        down = '.ffn_down_' in name
++        return SimpleNamespace(type_id=23, shape=(256, 2048, 512) if down else (256, 512, 2048))
++    def read_blocks(self, name, first, last):
++        width = 272 if '.ffn_down_' in name else 1088
++        return np.broadcast_to(np.arange(first,last,dtype=np.uint64).view(np.uint8).reshape(-1,8)[:, :1],(last-first,width)).copy()
++
++class SageExpertsTest(unittest.TestCase):
++    def test_exact_expert_major_rows_and_format(self):
++        sources = expert_sources(Fixture(), 39, 255)
++        for role in ('gate','up','down'):
++            count = 2048 if role == 'down' else 512
++            result = sources[role].read_encoded(count - 1, count)
++            self.assertEqual(result.format, 'gguf_iq4_xs')
++            expected = (255 * count + count - 1) % 256
++            self.assertTrue((result.codes.numpy() == expected).all())
++    def test_rejects_out_of_range_or_wrong_type(self):
++        for layer,expert in [(-1,0),(40,0),(0,-1),(0,256)]:
++            with self.assertRaises(ValueError): expert_sources(Fixture(), layer, expert)
++        class Bad(Fixture):
++            def info(self, name): return SimpleNamespace(type_id=12,shape=(256,512,2048))
++        with self.assertRaises(ValueError): expert_sources(Bad(),0,0)
++
++
++
++class SageRealExpertRowsTest(unittest.TestCase):
++    def test_optional_real_model_encoded_rows(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        model = os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf, open(model, 'rb') as raw:
++            for layer in range(40):
++                for expert in (0, 1, 127, 255):
++                    sources = expert_sources(gguf, layer, expert)
++                    for role in ('gate','up','down'):
++                        name = f'blk.{layer}.ffn_{role}_exps.weight'
++                        count, row_bytes = (2048, 272) if role == 'down' else (512, 1088)
++                        for row in (0, count - 1):
++                            actual = sources[role].read_encoded(row, row + 1)
++                            raw.seek(gguf.data_offset + gguf.info(name).offset + (expert*count+row)*row_bytes)
++                            self.assertEqual(actual.format, 'gguf_iq4_xs')
++                            self.assertEqual(actual.codes.numpy().tobytes(), raw.read(row_bytes))
++
++
++    def test_optional_real_expert_artifact_roundtrip(self):
++        import os, tempfile
++        from pathlib import Path
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.model import Model, Parameter
++        from tools.convert.recipe import Recipe
++        from tools.convert.methods import import_encoded
++        from tools.artifact.tensor_output import TensorOutput
++        from tools.artifact.writer import ArtifactWriter
++        from tools.artifact.reader import Artifact
++        model_path = os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model_path: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model_path) as gguf, tempfile.TemporaryDirectory() as tmp:
++            sources = expert_sources(gguf, 0, 255)
++            model = Model({'text': {'config': {}}})
++            for role, source in sources.items():
++                model.add(Parameter(role, source.shape, source, inputs=('input',)))
++            recipe = Recipe(model)
++            for role, source in sources.items():
++                recipe.assign(role, format='gguf_iq4_xs', method=import_encoded, source=source)
++            prepared = recipe.prepare(device='cpu', rows_per_chunk=127)
++            path = Path(tmp) / 'one-expert.ninfer'
++            with ArtifactWriter(path, [job.spec for job in prepared.weights],
++                                components=model.components, bindings=prepared.bindings,
++                                uses=prepared.uses) as writer:
++                for job in prepared.weights:
++                    job.prepared.produce(TensorOutput(writer, job.spec.id))
++            with Artifact(path) as artifact:
++                for job in prepared.weights:
++                    role = job.parameters[0]
++                    rows = 2048 if role == 'down' else 512
++                    expected = sources[role].read_encoded(0, rows).codes.numpy().tobytes()
++                    self.assertEqual(artifact.read_object(job.spec.id), expected)
+diff --git a/tests/convert/test_sage_iq4xs_oracle.py b/tests/convert/test_sage_iq4xs_oracle.py
+new file mode 100644
+--- /dev/null
++++ b/tests/convert/test_sage_iq4xs_oracle.py
+@@ -0,0 +1,53 @@
++import unittest
++import numpy as np
++from gguf import GGMLQuantizationType
++from gguf.quants import dequantize
++from tools.convert.sage_iq4xs_oracle import decode_iq4_xs
++
++class SageIQ4XSOracleTest(unittest.TestCase):
++    def test_against_gguf_with_adversarial_codes_and_scales(self):
++        rng = np.random.default_rng(7841)
++        blocks = rng.integers(0, 256, size=(7, 5, 136), dtype=np.uint8)
++        scales = np.array([0, 1, -1, .0625, -0.5, 100, 0.00006103515625],dtype='<f2')
++        blocks[:, :, :2] = scales[:, None, None].view(np.uint8).reshape(7, 1, 2)
++        raw = blocks.reshape(7,-1)
++        expected = dequantize(raw, GGMLQuantizationType.IQ4_XS)
++        np.testing.assert_array_equal(decode_iq4_xs(raw), expected.astype(np.float64))
++    def test_rejects_partial_blocks(self):
++        for x in (np.zeros((2,135),np.uint8),np.zeros((0,),np.uint8),np.zeros((1,0),np.uint8)):
++            with self.assertRaises(ValueError): decode_iq4_xs(x)
++
++    def test_optional_real_expert_blocks(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_gguf_experts import expert_sources
++        model = os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf:
++            for layer in (0, 19, 39):
++                for expert in (0, 127, 255):
++                    for role, source in expert_sources(gguf, layer, expert).items():
++                        count = 2048 if role == 'down' else 512
++                        for row in (0,count-1):
++                            blocks = source.read_encoded(row,row+1).codes.numpy()
++                            expected = dequantize(blocks, GGMLQuantizationType.IQ4_XS)
++                            np.testing.assert_array_equal(decode_iq4_xs(blocks), expected.astype(np.float64))
++
++class SageExpertMathTest(unittest.TestCase):
++    def test_expert_and_weighted_shared_against_scalar_math(self):
++        import math
++        from tools.convert.sage_iq4xs_oracle import expert_product, routed_sum
++        x = np.array([2.0, -1.0]); gate = np.array([[1., 0.], [0., 1.]])
++        up = np.array([[0.5, 1.], [-2., 0.]])
++        down = np.array([[1., 2.], [-1., 0.5]])
++        expit = lambda v: 1 / (1 + math.exp(-v))
++        m0 = (2 * expit(2)) * 0
++        m1 = (-1 * expit(-1)) * -4
++        expected = np.array([m0 + 2*m1, -m0 + .5*m1])
++        np.testing.assert_allclose(expert_product(x, gate, up, down), expected, rtol=1e-15)
++        result = routed_sum(x, {7:(gate,up,down)}, [7], [0.25], (gate,up,down), 0.75)
++        np.testing.assert_allclose(result, expected, rtol=1e-15)
++    def test_rejects_invalid_shapes_and_empty_routes(self):
++        from tools.convert.sage_iq4xs_oracle import expert_product, routed_sum
++        with self.assertRaises(ValueError): expert_product([1], [[1,2]], [[1,2]], [[1]])
++        with self.assertRaises(ValueError): routed_sum([1], {}, [], [], None, 1)

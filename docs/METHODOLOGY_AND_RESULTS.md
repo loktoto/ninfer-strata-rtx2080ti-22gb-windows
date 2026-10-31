@@ -24,6 +24,8 @@ The [A/B/C/D report](ABCD_COMPARISON_2026-10-30.md) records the fresh engine com
 7. Added the device-selected expert-ID path for gate/up and down projections. Device counters verify execution per layer/projection, including graph replay, and are read only after synchronization. A one-time host or GPU marker alone is not treated as full decode coverage.
 8. Replaced scalar decoding with packed byte permutations and integer `dp4a`, then corrected floating-point factor/reduction ordering. The first resident variant failed logits; the final tested variant matched native. A warp-local layout removed synchronization overhead while retaining the tested arithmetic order.
 9. Built in a separate clean Release/SM75 directory and repeated correctness and same-session performance checks. The original build was already Release/SM75; the useful fixes were coverage and kernel implementation, not merely renaming the build type.
+10. Tested the model's actual MTP block in a separate [draft-window study](IQ4XS_MTP_RESULTS_2026-10-30.md), including native/candidate/candidate/native and a fresh llama.cpp/candidate/candidate/llama.cpp comparison. Decode mode is labeled explicitly; this is separate from the no-draft kernel ablation.
+11. Fixed the API launcher's saved configuration: it previously omitted the IQ4_XS selection despite setting it for the initial process. Restarts now preserve that selection and disable inherited tracing. Added explicit graph/draft options with 17 passing launcher checks, including restart-environment regression coverage. The benchmark harness's explicit configs did not have this omission.
 
 ## Correctness and build procedure
 
@@ -31,7 +33,7 @@ Pinned PolyStrata and ggml source revisions are in `config/sources.lock.json`; t
 
 The evidence has several layers:
 
-- Independent long-double oracle: 122 GPU cases cover packed-code patterns, real matrix shapes, 1/3/8 experts, permuted expert IDs, nonzero weight offsets, shared/strided activations, guarded outputs, and graph replay. Tolerance is `2e-5 + 3e-6 * sum(abs(products))`; passing does not imply bitwise equality to the oracle.
+- Independent long-double oracle: the original 122 GPU cases were extended to 134, adding 32 device-selected expert IDs with eight experts per activation for four-token verification. Coverage includes packed-code patterns, real matrix shapes, permuted expert IDs, nonzero weight offsets, shared/strided activations, guarded outputs, and graph replay. Tolerance is `2e-5 + 3e-6 * sum(abs(products))`; passing does not imply bitwise equality to the oracle. The production executable was unchanged by this test extension.
 - A separate native-versus-candidate GPU check uses varied FP16 scales and requires exact equality for both model shapes.
 - A fixed prompt and 16 teacher-forced continuation positions compare the entire vocabulary, with RMSNorm and other candidates disabled. All 3,973,120 logits matched exactly on the clean build. Device counters showed 16 executions of each projection in every layer 0–39. Teacher forcing fixes inputs; the full logits, rather than the forced token IDs, are the correctness evidence.
 - All 88 Python tests passed, including the repaired Windows CRLF patch fixtures. The host adapter and patch-series checks passed. The older 85/88 result is retained as historical evidence rather than overwritten.
@@ -46,7 +48,13 @@ Each process start runs arithmetic, Python generation, and retrieval in three in
 
 For the optimized kernel, use native/candidate/candidate/native starts. Four warmed samples per variant across two starts give arithmetic **107.85 → 115.00 tok/s (+6.63%)** and Python **108.60 → 115.95 (+6.77%)**. Retrieval prefill is **2233.65 → 2213.65 tok/s (-0.90%)**. All response text and token counts matched. The [sample export](../evidence/published-benchmarks/2026-10-30-optimization-samples.json) and [summary](../evidence/published-benchmarks/2026-10-30-optimization-summary.json) preserve this trial independently of the newer A/B/C/D run.
 
-No 40% whole-model uplift has been demonstrated. The native graph-option experiment and isolated expert-kernel timings must not be substituted for this B-versus-D result. Two starts per variant and a small prompt set do not establish a confidence interval, general quality, occupied-32K performance or MTP behavior. Session-to-session rates changed materially, so comparing yesterday's A with today's D cannot establish a controlled uplift.
+The no-draft trial does not demonstrate a 40% whole-model uplift. The native graph-option experiment and isolated expert-kernel timings must not be substituted for this B-versus-D result. Two starts per variant and a small prompt set do not establish a confidence interval, general quality or occupied-32K performance. The later [MTP study](IQ4XS_MTP_RESULTS_2026-10-30.md) records drafting separately. Session-to-session rates changed materially, so comparing yesterday's A with today's D cannot establish a controlled uplift.
+
+The [NInfer research](NINFER_UPLIFT_REPORTS_2026-10-30.md) preserves the hardware,
+model and decoding conditions behind published large gains. The [Sage Strata
+fork review](STRATA_SAGE_RESEARCH_2026-10-30.md) distinguishes the separate
+`src/qwen35` implementation from our pinned PolyStrata `src/poly` engine and
+records the concrete Windows/SM75 build and model-loader investigation.
 
 ## October 29 evidence recovered and indexed
 
