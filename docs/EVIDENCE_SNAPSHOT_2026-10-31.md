@@ -27,7 +27,9 @@ archive and updates the digest index. It never replaces an existing archive.
 exports; `python tools/export_mtp_numeric.py` regenerates the draft study's
 samples, telemetry and summaries from the retained originals.
 
-At publication, the separate Sage Strata fork is still being built and the
-standalone NInfer port is incomplete. Their [research](STRATA_SAGE_RESEARCH_2026-10-30.md)
-and [CPU progress](NINFER_STANDALONE_PROGRESS_2026-10-31.md) reports distinguish
-observed results from source-only work; neither is assigned an unmeasured speed.
+At this snapshot's capture time, the separate Sage Strata fork was still being
+built and the standalone NInfer port was incomplete. The later
+[fork build and smoke report](STRATA_SAGE_FORK_BUILD_2026-10-31.md) and
+[standalone progress](NINFER_STANDALONE_PROGRESS_2026-10-31.md) distinguish
+subsequent observed results from source-only work; neither is assigned an
+unmeasured speed.

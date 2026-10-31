@@ -38,7 +38,7 @@ The evidence has several layers:
 - A fixed prompt and 16 teacher-forced continuation positions compare the entire vocabulary, with RMSNorm and other candidates disabled. All 3,973,120 logits matched exactly on the clean build. Device counters showed 16 executions of each projection in every layer 0–39. Teacher forcing fixes inputs; the full logits, rather than the forced token IDs, are the correctness evidence.
 - All 88 Python tests passed, including the repaired Windows CRLF patch fixtures. The host adapter and patch-series checks passed. The older 85/88 result is retained as historical evidence rather than overwritten.
 
-The [numeric correctness export](../evidence/published-benchmarks/2026-10-30-correctness.json) includes the full-logit summary and per-layer counts. `tools/validate_iq4xs_resident.py` reproduces the model check using user-supplied local paths. A separate real-model GPU launch timeline was not collected; graph-option-enabled execution and the kernel oracle's replay checks should not be overstated as that timeline.
+The [numeric correctness export](../evidence/published-benchmarks/2026-10-30-correctness.json) includes the full-logit summary and per-layer counts. `tools/validate_iq4xs_resident.py` reproduces the model check using user-supplied local paths. A real-model GPU launch timeline was not part of that original correctness run. The later [October 31 CUPTI activity study](GPU_PROFILE_2026-10-31.md) separately confirms graph replay and the candidate expert kernels during a bounded API request, with its own instrumentation and coverage limits. Its kernel durations are diagnostic, not substitutes for uninstrumented throughput.
 
 ## Performance procedure
 
