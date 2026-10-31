@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT / "integration" / "strata"))
 from launch_strict import launch_spec
 
 ENV_KEYS = ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS",
-            "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K", "STRATA_SAGE_EXPERT_Q6K")
+            "STRATA_SAGE_TRACE", "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K",
+            "STRATA_SAGE_EXPERT_Q6K", "STRATA_SAGE_EXPERT_IQ4XS")
 
 
 def positive_int(value):
@@ -48,6 +49,10 @@ def main(argv=None):
     parser.add_argument("--max-context", type=positive_int, default=8192,
                         help="allocated context tokens (default 8192; 256K is not qualified)")
     parser.add_argument("--threads", type=positive_int, help="CPU threads for uncached experts")
+    parser.add_argument("--cuda-graphs", action="store_true",
+                        help="allow CUDA graphs (diagnostic default disables them)")
+    parser.add_argument("--draft-window", type=int, choices=(2, 3, 4),
+                        help="experimental verification window: one known token plus up to 1–3 MTP guesses; requires --cuda-graphs")
     parser.add_argument("--ninfer-rmsnorm", action="store_true", help="opt into the experimental RMSnorm candidate")
     parser.add_argument("--ninfer-expert-q4k", action="store_true", help="opt into the experimental Q4_K candidate")
     parser.add_argument("--ninfer-expert-iq4xs", action="store_true", help="opt into the experimental IQ4_XS expert candidate")
@@ -58,6 +63,8 @@ def main(argv=None):
         parser.error("native startup requires Windows; use --dry-run for a Linux plan")
     if not args.model_name.strip():
         parser.error("--model-name must not be empty")
+    if args.draft_window is not None and not args.cuda_graphs:
+        parser.error("--draft-window requires --cuda-graphs to select the measured experimental profile")
     try:
         upstream = args.upstream.resolve()
         extra = ["--max-context", str(args.max_context)]
@@ -65,6 +72,11 @@ def main(argv=None):
             extra += ["--threads", str(args.threads)]
         engine_command, env = launch_spec(args.engine, args.model, extra,
                                          args.ninfer_rmsnorm, ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k, ninfer_expert_iq4xs=args.ninfer_expert_iq4xs)
+        if args.cuda_graphs:
+            engine_command.remove("--no-graphs")
+        if args.draft_window is not None:
+            engine_command.remove("--no-draft")
+            engine_command[engine_command.index("--window") + 1] = str(args.draft_window)
         if Path(engine_command[0]).stem.lower() not in {"strata-poly", "strata-glm"}:
             raise ValueError("--engine must be named strata-poly.exe (or strata-poly on Linux dry runs); the server selects its GGUF protocol by executable name")
         validate_upstream(upstream)

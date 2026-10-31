@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "cases": {
+    "arithmetic": {
+      "A": {
+        "decode_samples": [
+          87.01762562031915,
+          86.21100124518986,
+          89.71767836174769,
+          91.22053843781585
+        ],
+        "median": 88.36765199103343,
+        "completion_tokens": [
+          240,
+          240,
+          240,
+          240
+        ],
+        "draft_offered": 0,
+        "draft_accepted": 0,
+        "text_and_reasoning_match_A": true
+      },
+      "D": {
+        "decode_samples": [
+          146.6,
+          146.6,
+          148.6,
+          146.8
+        ],
+        "median": 146.7,
+        "completion_tokens": [
+          240,
+          240,
+          240,
+          240
+        ],
+        "draft_offered": 651,
+        "draft_accepted": 570,
+        "text_and_reasoning_match_A": true
+      },
+      "A-MTP": {
+        "decode_samples": [
+          73.05265017592241,
+          85.08499243135171
+        ],
+        "median": 79.06882130363707,
+        "completion_tokens": [
+          240,
+          240
+        ],
+        "draft_offered": 332,
+        "draft_accepted": 286,
+        "text_and_reasoning_match_A": true
+      },
+      "D_vs_A_percent": 66.01097425886735
+    },
+    "python": {
+      "A": {
+        "decode_samples": [
+          85.14833386583592,
+          86.11685662412441,
+          90.68362977451392,
+          91.90781224836022
+        ],
+        "median": 88.40024319931916,
+        "completion_tokens": [
+          110,
+          110,
+          110,
+          110
+        ],
+        "draft_offered": 0,
+        "draft_accepted": 0,
+        "text_and_reasoning_match_A": true
+      },
+      "D": {
+        "decode_samples": [
+          138.2,
+          140.0,
+          142.0,
+          140.8
+        ],
+        "median": 140.4,
+        "completion_tokens": [
+          110,
+          110,
+          110,
+          110
+        ],
+        "draft_offered": 291,
+        "draft_accepted": 240,
+        "text_and_reasoning_match_A": true
+      },
+      "A-MTP": {
+        "decode_samples": [
+          77.18890745828966,
+          77.54541030770588
+        ],
+        "median": 77.36715888299777,
+        "completion_tokens": [
+          110,
+          110
+        ],
+        "draft_offered": 142,
+        "draft_accepted": 124,
+        "text_and_reasoning_match_A": true
+      },
+      "D_vs_A_percent": 58.823092469819514
+    },
+    "retrieval": {
+      "A": {
+        "decode_samples": [
+          75.7704911822091,
+          61.800400157591014,
+          77.32158045310446,
+          78.93672234994622
+        ],
+        "median": 76.54603581765679,
+        "completion_tokens": [
+          9,
+          9,
+          9,
+          9
+        ],
+        "draft_offered": 0,
+        "draft_accepted": 0,
+        "text_and_reasoning_match_A": true
+      },
+      "D": {
+        "decode_samples": [
+          151.8,
+          167.6,
+          152.8,
+          173.4
+        ],
+        "median": 160.2,
+        "completion_tokens": [
+          9,
+          9,
+          9,
+          9
+        ],
+        "draft_offered": 21,
+        "draft_accepted": 19,
+        "text_and_reasoning_match_A": true
+      },
+      "A-MTP": {
+        "decode_samples": [
+          75.50588945937783,
+          51.963573534952
+        ],
+        "median": 63.734731497164915,
+        "completion_tokens": [
+          9,
+          9
+        ],
+        "draft_offered": 10,
+        "draft_accepted": 10,
+        "text_and_reasoning_match_A": true
+      },
+      "D_vs_A_percent": 109.28582164805829
+    }
+  }
+}
