@@ -1,0 +1,132 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3b4223f..e805195 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -786,6 +786,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+     # the hybrid mode (experts that do not all fit in VRAM): the CPU expert pool on ggml-cpu's arithmetic
+     target_link_libraries(strata_qwen35 PRIVATE strata_kernels_cpu)
+     target_compile_definitions(strata_qwen35 PRIVATE STRATA_Q36_CPU_POOL=1)
++    if(STRATA_BUILD_TESTS)
++      add_executable(q36_q4k_upload_test src/qwen35/q36_q4k_upload_test.cpp)
++      target_link_libraries(q36_q4k_upload_test PRIVATE ggml-base)
++      add_test(NAME q36_q4k_upload_test COMMAND q36_q4k_upload_test)
++    endif()
+   endif()
+   add_executable(strata-q36 src/qwen35/q36_main.cpp)
+   strata_utf8_manifest(strata-q36)
+diff --git a/src/qwen35/q36_engine.cu b/src/qwen35/q36_engine.cu
+index 56e2570..71d5d5d 100644
+--- a/src/qwen35/q36_engine.cu
++++ b/src/qwen35/q36_engine.cu
+@@ -36,6 +36,9 @@
+ #include "q36_pattn.cuh"
+ #include "q36_gdn.cuh"
+ #include "q36_sampling.hpp"
++#ifdef STRATA_Q36_CPU_POOL
++#include "q36_q4k_upload.hpp"
++#endif
+ #if defined(STRATA_Q36_CPU_POOL)
+ #include "strata/kernels/cpu/native_expert.hpp"
+ #include "strata/kernels/cpu/pool.hpp"
+@@ -1232,8 +1235,18 @@ float* upload_f32(const strata::TensorInfo& t, const uint8_t* src) {
+             const float d = f16_to_f32((uint16_t) (q[0] | (q[1] << 8)));
+             for (int j = 0; j < 32; ++j) h[b * 32 + j] = d * (float) (int8_t) q[2 + j];
+         }
+-    } else {
+-        std::fprintf(stderr, "strata-q36: %s is %s, expected F32, BF16, F16 or Q8_0\n", t.name.c_str(), t.type_name());
++    }
++#ifdef STRATA_Q36_CPU_POOL
++    else if (t.type == 12 && q36_decode_q4k(src, h.data(), h.size())) {
++        // Q4_K ssm_alpha/beta: preserve the GGUF's represented values in FP32.
++    }
++#endif
++    else {
++        std::fprintf(stderr, "strata-q36: %s is %s, expected F32, BF16, F16 or Q8_0"
++#ifdef STRATA_Q36_CPU_POOL
++                     " or block-aligned Q4_K"
++#endif
++                     "\n", t.name.c_str(), t.type_name());
+         std::exit(1);
+     }
+     float* d = nullptr;
+diff --git a/src/qwen35/q36_q4k_upload.hpp b/src/qwen35/q36_q4k_upload.hpp
+new file mode 100644
+index 0000000..32d5e6c
+--- /dev/null
++++ b/src/qwen35/q36_q4k_upload.hpp
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++#include "ggml.h"
++
++// Decode exactly the values represented by GGUF Q4_K blocks; never requantize.
++inline bool q36_decode_q4k(const uint8_t* src, float* dst, size_t count) {
++    if (!src || !dst || count == 0 || count % 256 != 0 || count > INT64_MAX) return false;
++    const ggml_type_traits* traits = ggml_get_type_traits(GGML_TYPE_Q4_K);
++    if (!traits || !traits->to_float) return false;
++    traits->to_float(src, dst, static_cast<int64_t>(count));
++    return true;
++}
+diff --git a/src/qwen35/q36_q4k_upload_test.cpp b/src/qwen35/q36_q4k_upload_test.cpp
+new file mode 100644
+index 0000000..383c401
+--- /dev/null
++++ b/src/qwen35/q36_q4k_upload_test.cpp
+@@ -0,0 +1,55 @@
++#include "q36_q4k_upload.hpp"
++#include <array>
++#include <cstdio>
++
++int main() {
++    // Two explicit GGUF Q4_K blocks: d=1, dmin=0, every subgroup scale=1.
++    // Each quant byte holds different low/high nibbles, exercising their order.
++    std::array<uint8_t, 288> input{};
++    for (size_t b = 0; b < 2; ++b) {
++        auto* p = input.data() + b * 144;
++        p[1] = 0x3c; // binary16 1.0
++        for (int i = 0; i < 4; ++i) { p[4+i] = 1; p[12+i] = 1; }
++        for (int i = 0; i < 128; ++i)
++            p[16+i] = static_cast<uint8_t>(((15 - i % 16) << 4) | (i % 16));
++    }
++    std::array<float, 514> out{};
++    out.front() = 123; out.back() = 456;
++    if (!q36_decode_q4k(input.data(), out.data() + 1, 512)) return 1;
++    for (int b = 0; b < 2; ++b)
++        for (int group = 0; group < 4; ++group)
++            for (int i = 0; i < 64; ++i) {
++                const int q = (group * 32 + i % 32) % 16;
++                const float expected = static_cast<float>(i < 32 ? q : 15 - q);
++                if (out[1 + b * 256 + group * 64 + i] != expected) return 2;
++            }
++    if (out.front() != 123 || out.back() != 456) return 3;
++    // Nonzero minima, upper scale/min bits, and a negative binary16 scale.
++    constexpr int scale[8] = {33, 34, 35, 36, 49, 50, 51, 52};
++    constexpr int minimum[8] = {17, 18, 19, 20, 33, 34, 35, 36};
++    std::array<uint8_t, 144> rich{};
++    rich[1] = 0xbc; // d = -1
++    rich[3] = 0x38; // dmin = 0.5
++    for (int j = 0; j < 4; ++j) {
++        rich[4+j] = static_cast<uint8_t>(scale[j] | ((scale[j+4] >> 4) << 6));
++        rich[8+j] = static_cast<uint8_t>(minimum[j] | ((minimum[j+4] >> 4) << 6));
++        rich[12+j] = static_cast<uint8_t>((minimum[j+4] & 15) << 4 | (scale[j+4] & 15));
++    }
++    for (int i = 0; i < 128; ++i) rich[16+i] = static_cast<uint8_t>(((15-i%16)<<4) | (i%16));
++    out.front() = 123; out[257] = 456;
++    if (!q36_decode_q4k(rich.data(), out.data() + 1, 256)) return 5;
++    for (int group = 0; group < 8; ++group)
++        for (int i = 0; i < 32; ++i) {
++            const int nibble = group % 2 ? 15 - i % 16 : i % 16;
++            const float expected = static_cast<float>(-scale[group] * nibble) - 0.5f * minimum[group];
++            if (out[1 + group * 32 + i] != expected) return 6;
++        }
++    if (out.front() != 123 || out[257] != 456) return 7;
++    if (q36_decode_q4k(input.data(), out.data(), 255) ||
++        q36_decode_q4k(input.data(), out.data(), 0) ||
++        q36_decode_q4k(input.data(), out.data(), SIZE_MAX - 255) ||
++        q36_decode_q4k(nullptr, out.data(), 256) ||
++        q36_decode_q4k(input.data(), nullptr, 256)) return 4;
++    std::puts("Q4_K float upload decoder: PASS");
++    return 0;
++}

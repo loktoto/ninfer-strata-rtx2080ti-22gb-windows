@@ -3,8 +3,10 @@
 One Strata-owned runtime for Sage-A1.5 GGUF on Windows 11 x64 and the
 RTX 2080 Ti 22GB (SM75), with selected NInfer-derived CUDA operations.
 
-**Development implementation; hardware acceptance is pending.** This repository
-does not yet provide a qualified Windows executable. Bounded on-device throughput measurements are published below; no 256K-context success is claimed.
+**Experimental Windows implementation, built and tested on the target PC.**
+The IQ4_XS expert path has bounded GPU correctness and throughput evidence;
+broader release acceptance is incomplete and no downloadable qualified executable
+or 256K-context success is claimed.
 
 **Current scope: Strata + NInfer on normal SM75. Turing Unlock is deferred**
 by the project owner; it is not a dependency of this release. Preserve its
@@ -59,6 +61,11 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 ## Build the Windows inference runtime
+
+For the already prepared PC, follow the [detailed IQ4_XS setup guide](docs/IQ4XS_SETUP.md)
+and use `tools/start_iq4xs.ps1` to start the measured combined profile or its
+native/no-draft controls. The guide also covers a fresh source build, API
+verification, application settings, saved configurations and troubleshooting.
 
 Use an x64 Visual Studio developer PowerShell with CUDA's compiler on PATH.
 The CUDA/MSVC combination still requires target-machine qualification. The build
