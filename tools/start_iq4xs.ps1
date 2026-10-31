@@ -1,13 +1,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Model,
-    [string]$Engine = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build-optimized\strata\strata-poly.exe'),
+    [string]$Engine,
     [switch]$Native,
     [switch]$NoDraft,
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
+if (-not $Engine) { $Engine = Join-Path $Root 'build-optimized\strata\strata-poly.exe' }
 $Python = Join-Path $Root '.venv\Scripts\python.exe'
 $CudaBin = Join-Path $Root '.cuda\bin\x64'
 foreach ($item in @(@('Python', $Python), @('engine', $Engine), @('model', $Model))) {
