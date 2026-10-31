@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "request_completed": true,
+  "completion_tokens": 240,
+  "clock_anchor_count": 73,
+  "clock_offset_spread_ns": 24300,
+  "drop_or_record_errors": 0,
+  "kernel_records": 317259,
+  "graph_kernel_records": 312480,
+  "distinct_nonzero_graph_ids": 122,
+  "kernels": {
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c24native_mmvq_slots_kernelINS1_11IQ4XSTraitsELi2ENS0_7MmvqIdsEEEvT1_ii": {
+      "count": 19200,
+      "duration_ns": 508715242
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c23native_q4_k_mmvq_kernelILb0EEEvPKNS1_8Q4KBlockEPKNS1_8Q81BlockEPfii": {
+      "count": 60000,
+      "duration_ns": 469014494
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c23native_q6_k_mmvq_kernelILb0EEEvPKNS1_8Q6KBlockEPKNS1_8Q81BlockEPfii": {
+      "count": 5040,
+      "duration_ns": 298231247
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e11gemv_kernelIfEEvPKT_PKfPfiii": {
+      "count": 19280,
+      "duration_ns": 130902776
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c27native_quantize_q8_1_kernelEPKfPNS1_8Q81BlockEi": {
+      "count": 48720,
+      "duration_ns": 88788734
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e15rms_norm_kernelEPKfS3_Pfifi": {
+      "count": 19600,
+      "duration_ns": 83617877
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e20gdn_state_reg_kernelILi4EEEvPKfS4_S4_PfS5_iiiiS5_yj": {
+      "count": 7260,
+      "duration_ns": 75268280
+    },
+    "_Z9mul_mat_qIL9ggml_type23ELi24ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 32,
+      "duration_ns": 53086291
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e12route_kernelILi8EEEvPKfiiiifS4_S4_bfPiPf": {
+      "count": 9640,
+      "duration_ns": 44732628
+    },
+    "_Z9mul_mat_qIL9ggml_type23ELi32ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 44,
+      "duration_ns": 42124108
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e11axpy_kernelEPKffPfib": {
+      "count": 19360,
+      "duration_ns": 34190806
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c23native_q6_k_mmvq_kernelILb1EEEvPKNS1_8Q6KBlockEPKNS1_8Q81BlockEPfii": {
+      "count": 4800,
+      "duration_ns": 33777603
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c23native_q4_k_mmvq_kernelILb1EEEvPKNS1_8Q4KBlockEPKNS1_8Q81BlockEPfii": {
+      "count": 4800,
+      "duration_ns": 30205141
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e18mul_sigmoid_kernelEPfPKfiib": {
+      "count": 12100,
+      "duration_ns": 23880639
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e14moe_sum_kernelEPKfS3_Pfii": {
+      "count": 9640,
+      "duration_ns": 22208479
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e16gemm_tile_kernelEPKfS3_Pfiii": {
+      "count": 40,
+      "duration_ns": 21662159
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e17conv4_silu_kernelEPKfPfS3_S4_iiS4_yj": {
+      "count": 7230,
+      "duration_ns": 20632038
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e21attn_score_reg_kernelILi8ELi2ELb0EEEvPKfPK6__halfPfiiixiifiixPKxPKaPKt": {
+      "count": 2410,
+      "duration_ns": 19756225
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e24swiglu_clamp_rows_kernelEPKfPfif": {
+      "count": 9880,
+      "duration_ns": 18871634
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e12copy2_kernelEPKjPjiS3_S4_i": {
+      "count": 10161,
+      "duration_ns": 18871440
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e15gdn_norm_kernelEPfiiyf": {
+      "count": 7260,
+      "duration_ns": 17581264
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e14gdn_out_kernelEPfPKfS4_if": {
+      "count": 7260,
+      "duration_ns": 17306087
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e16gdn_gates_kernelEPfS2_PKfS4_ii": {
+      "count": 7260,
+      "duration_ns": 16855038
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19swiglu_clamp_kernelEPKfS3_Pfif": {
+      "count": 9680,
+      "duration_ns": 16716705
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e21head_norm_rope_kernelEPKfiS3_PfiiifS3_xfPKiiPKx": {
+      "count": 4840,
+      "duration_ns": 15978070
+    },
+    "_Z9mul_mat_qIL9ggml_type12ELi48ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 210,
+      "duration_ns": 15896157
+    },
+    "_Z9mul_mat_qIL9ggml_type23ELi16ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 4,
+      "duration_ns": 15345230
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c24native_mmvq_slots_kernelINS1_11IQ4XSTraitsELi2ENS0_9MmvqSlotsEEEvT1_ii": {
+      "count": 480,
+      "duration_ns": 15025744
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19attn_value_t_kernelILi1ELb0EEEvPKfPK6__halfPfiiiixiiiixPKxPKaPKt": {
+      "count": 2400,
+      "duration_ns": 13896464
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19store_f16_at_kernelEPKfP6__halfiiPKxi": {
+      "count": 4800,
+      "duration_ns": 8330575
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19attn_softmax_kernelEPfixiiixPKxS2_iPKf": {
+      "count": 2410,
+      "duration_ns": 8319272
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e17gemm_small_kernelEPKfS3_Pfiii": {
+      "count": 40,
+      "duration_ns": 7503519
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c24native_mmvq_multi_kernelINS1_9Q4KTraitsELi6ELi4ELi2ELb0ELb0EEEvPKNT_5BlockEPKNS1_8Q81BlockEPfiiS7_SB_": {
+      "count": 270,
+      "duration_ns": 6651737
+    },
+    "_Z9mul_mat_qIL9ggml_type23ELi40ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 44,
+      "duration_ns": 5856335
+    },
+    "_Z9mul_mat_qIL9ggml_type14ELi48ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 40,
+      "duration_ns": 4552288
+    },
+    "_Z24mul_mat_q_stream_k_fixupIL9ggml_type12ELi48ELb0EEvPKiS2_PfS3_5uint3iiiS4_iS4_iS4_": {
+      "count": 184,
+      "duration_ns": 3640787
+    },
+    "_Z9mul_mat_qIL9ggml_type23ELi48ELb0EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 14,
+      "duration_ns": 2988025
+    },
+    "_Z9mul_mat_qIL9ggml_type12ELi64ELb1EEvPKcPKiS4_S4_PfS5_PKf5uint3iiiiiS8_S8_iiiS8_S8_iiiS8_": {
+      "count": 60,
+      "duration_ns": 2385167
+    },
+    "_Z24mul_mat_q_stream_k_fixupIL9ggml_type12ELi64ELb1EEvPKiS2_PfS3_5uint3iiiS4_iS4_iS4_": {
+      "count": 60,
+      "duration_ns": 2335240
+    },
+    "_Z17quantize_mmq_q8_1IL18mmq_q8_1_ds_layout1ELb0EEvPKfPKiPvxxxxxiii": {
+      "count": 270,
+      "duration_ns": 1666720
+    },
+    "_ZN6strata7kernels47_GLOBAL__N__31c79c61_14_native_mmvq_cu_30eb090c24native_mmvq_multi_kernelINS1_9Q6KTraitsELi6ELi4ELi2ELb0ELb0EEEvPKNT_5BlockEPKNS1_8Q81BlockEPfiiS7_SB_": {
+      "count": 40,
+      "duration_ns": 1570796
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e22conv4_silu_rows_kernelEPKfS3_S3_Pfi": {
+      "count": 30,
+      "duration_ns": 1030334
+    },
+    "_Z17quantize_mmq_q8_1IL18mmq_q8_1_ds_layout0ELb0EEvPKfPKiPvxxxxxiii": {
+      "count": 120,
+      "duration_ns": 998140
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e17add_scaled_kernelENS0_10ScaledRowsEii": {
+      "count": 80,
+      "duration_ns": 755564
+    },
+    "_Z24mul_mat_q_stream_k_fixupIL9ggml_type14ELi48ELb0EEvPKiS2_PfS3_5uint3iiiS4_iS4_iS4_": {
+      "count": 26,
+      "duration_ns": 436211
+    },
+    "_ZN7cutlass7Kernel2I49cutlass_75_tensorop_s1688gemm_f16_64x64_tn_align1EEvNT_6ParamsE": {
+      "count": 10,
+      "duration_ns": 312757
+    },
+    "_ZN7cutlass7Kernel2I49cutlass_75_tensorop_s1688gemm_f16_64x64_nn_align1EEvNT_6ParamsE": {
+      "count": 10,
+      "duration_ns": 141307
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e18conv4_state_kernelEPKfPfii": {
+      "count": 30,
+      "duration_ns": 110143
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e25attn_softmax_block_kernelEPKfP6__halfixxiiiixPfS6_S6_b": {
+      "count": 10,
+      "duration_ns": 107611
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19attn_ungroup_kernelEPKfPfiiii": {
+      "count": 10,
+      "duration_ns": 100283
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e16store_f16_kernelEPKfP6__halfi": {
+      "count": 40,
+      "duration_ns": 95419
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e17attn_group_kernelEPKfP6__halfiiii": {
+      "count": 10,
+      "duration_ns": 93342
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e19attn_value_t_kernelILi2ELb0EEEvPKfPK6__halfPfiiiixiiiixPKxPKaPKt": {
+      "count": 10,
+      "duration_ns": 84669
+    },
+    "_ZN6strata4poly43_GLOBAL__N__bf790f00_10_kernels_cu_34a0089e17attn_scale_kernelEPfPKfib": {
+      "count": 10,
+      "duration_ns": 76414
+    }
+  },
+  "launch_apis": {
+    "cudaGraphLaunch_v10000": {
+      "count": 599,
+      "duration_ns": 436959300
+    },
+    "cudaLaunchKernel_v7000": {
+      "count": 7122,
+      "duration_ns": 100147500
+    },
+    "cuLaunchKernel": {
+      "count": 20,
+      "duration_ns": 406200
+    }
+  },
+  "note": "Request window includes prefill and decode; sums can overlap and instrumentation changes timing."
+}

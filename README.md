@@ -29,6 +29,9 @@ identifies a separate Sage fork, its benchmark conditions, and Windows/SM75 appl
 The [October 31 snapshot index](docs/EVIDENCE_SNAPSHOT_2026-10-31.md) accounts for
 the preserved raw evidence, while [standalone NInfer progress](docs/NINFER_STANDALONE_PROGRESS_2026-10-31.md)
 records the tested CPU import work and remaining C-runtime work.
+The [GPU activity study](docs/GPU_PROFILE_2026-10-31.md) verifies actual CUDA
+graph replay and expert-kernel execution, and identifies the remaining work
+without substituting instrumented timings for throughput benchmarks.
 
 ## What is implemented
 

@@ -1,5 +1,14 @@
 # A/B/C/D comparison — October 30, 2026
 
+This page preserves the original **no-draft** comparison. A later, separately
+controlled [MTP study](IQ4XS_MTP_RESULTS_2026-10-30.md) measured D at 146.70 versus
+A at 88.37 tokens/s on arithmetic (+66.0%), and 140.40 versus 88.40 on Python
+(+58.8%). Those are whole-configuration gains with drafting in D and no drafting
+in A, not NInfer-only gains. The same study includes a matched B/D MTP comparison
+and a slower llama.cpp MTP control. C remains unmeasured; see the updated
+[standalone port status](NINFER_STANDALONE_PROGRESS_2026-10-31.md). Do not combine
+samples or percentages across these experiments.
+
 ## Definitions and completion status
 
 | Variant | Engine | Same Sage IQ4_XS model | Status |
