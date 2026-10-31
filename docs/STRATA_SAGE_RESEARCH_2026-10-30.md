@@ -1,6 +1,6 @@
 # Existing Strata work for Sage-A1.5 — research 2026-10-30
 
-Yes. A separate contributor has made and tested substantial Sage-A1.5-specific Strata work: [xyehya/Strata q36-r2](https://github.com/xyehya/Strata/tree/379f095027097937f28c5c009cacbbb66504d957), with a [Sage artifact and model card](https://huggingface.co/ykarout/Strata-Sage-A1.5-GGUF). This branch is built on **Niko1221/Strata's `src/qwen35` engine**, distinct from the **VecSzn/PolyStrata `src/poly` engine** in our tests. They implement the same model family but do not share an identical driver, buffers, quantization or scheduling contract. We have not built or run this separate fork locally.
+Yes. A separate contributor has made and tested substantial Sage-A1.5-specific Strata work: [xyehya/Strata q36-r2](https://github.com/xyehya/Strata/tree/379f095027097937f28c5c009cacbbb66504d957), with a [Sage artifact and model card](https://huggingface.co/ykarout/Strata-Sage-A1.5-GGUF). This branch is built on **Niko1221/Strata's `src/qwen35` engine**, distinct from the **VecSzn/PolyStrata `src/poly` engine** in our tests. They implement the same model family but do not share an identical driver, buffers, quantization or scheduling contract. The fork was later built and run locally; see the [October 31 build and smoke report](STRATA_SAGE_FORK_BUILD_2026-10-31.md).
 
 ## What was actually tested
 
@@ -10,7 +10,7 @@ Yes. A separate contributor has made and tested substantial Sage-A1.5-specific S
 - [PR 3904](https://github.com/Niko1221/Strata/pull/3904), open, reports +54% prompt throughput at 90K and +159% at 200K for combined `--fused-prompt-attn --chunked-gdn` on RTX 5080. The former requires sm_80+, both change reduction order, and the PR did not run full flag-on KL on that revision. These are long-prefill results, not short decode results.
 - [PR 3905](https://github.com/Niko1221/Strata/pull/3905), open, reports +4.7% forced decode at 4K on RTX 5080 from reduction/quantization work, with selected identical-logit tests. Its additional `--side-stream` and `--split-stage-copy` combined raise the reported gain to +9.1%, but the timing did not separate those flags. The side stream is not used for captured decode graphs, and the copy optimization targets hybrid placement. Neither gain is established on the fully resident 2080 Ti.
 - [PR 3906](https://github.com/Niko1221/Strata/pull/3906) reports +17.3% at 4K using a group of hybrid expert-placement flags, with non-additive and sometimes negative individual effects; timing-dependent flags can alter reproducibility. [PR 3908](https://github.com/Niko1221/Strata/pull/3908) reports +23% greedy MTP2 versus plain decode at 4K on the same 5080 setup, and +21.8% sampled MTP/GPU-sampling on its separate workload. MTP acceptance, precision, hardware and residency must be measured here.
-- The [PR 3910](https://github.com/Niko1221/Strata/pull/3910) chain explicitly lists #3699, #3903–#3910 as stacked open work. Its report builds `75;120` but runs on the 5080, not SM75; Windows and 24/32 GB cards were not tested. The branch's [CMake configuration](https://github.com/xyehya/Strata/blob/379f095027097937f28c5c009cacbbb66504d957/CMakeLists.txt#L180-L219) permits SM75 and includes MSVC conditions, so Windows/SM75 is a candidate, not a proven blocker or a verified working build. The default CUDA architecture is 120: a local build must explicitly select 75.
+- The [PR 3910](https://github.com/Niko1221/Strata/pull/3910) chain explicitly lists #3699, #3903–#3910 as stacked open work. Its report builds `75;120` but runs on the 5080, not SM75; Windows and 24/32 GB cards were not tested. The branch's [CMake configuration](https://github.com/xyehya/Strata/blob/379f095027097937f28c5c009cacbbb66504d957/CMakeLists.txt#L180-L219) permits SM75 and includes MSVC conditions, so Windows/SM75 was initially a candidate; our later patched build and short smoke run are documented in the [October 31 report](STRATA_SAGE_FORK_BUILD_2026-10-31.md). The default CUDA architecture is 120: a local build must explicitly select 75.
 
 ## Our pinned engine and newer PolyStrata
 
@@ -24,26 +24,12 @@ At this research snapshot, [PolyStrata main 20d839d](https://github.com/VecSzn/P
 2. **MoE combine:** our `Engine::moe_card` calls `moe_sum` after expert products; compare its dataflow and summation order against `k_moe_out_s8`. Avoid assuming their residual, activation, quantized buffer or routing layouts match. Measure kernel and end-to-end time before investing; no SM75 gain is known.
 3. **Attention/GDN:** check shape- and architecture-guarded PR paths against `Qwen35::gdn`, `gdn_step`, and native graph capture; the fork's sm_80-only prompt attention/MMA cannot run as advertised on SM75. Grouped attention and INT8 KV are separate quality/configuration experiments, not equal-FP16 comparisons.
 4. **Update study:** compare fixed revisions and integration patch applicability in an isolated checkout, identify changed SM75-capable runtime paths, run exact-model baseline and candidate under matched flags, and retain the original pin until proven. Profile before prioritizing.
-5. **Standalone Strata fork:** verify its loader's supported expert formats before attempting unchanged IQ4_XS. The Q4_K Sage graft is a separate artifact and must never be substituted in a same-weight comparison. Establish CMake/MSVC/CUDA 75 build, tokenization, logits, memory fit and graph execution before benchmarking; use a separate clone and no default routing bias.
+5. **Standalone Strata fork:** the patched SM75 build has now run the unchanged IQ4_XS model in a short smoke; see the [build report](STRATA_SAGE_FORK_BUILD_2026-10-31.md). Validate full logits, broad quality, graph execution and reproducible multi-workload benchmarks before drawing performance conclusions. The Q4_K Sage graft is a separate artifact and must not be substituted in a same-weight comparison.
 
 The initial sandboxed clone failed at network name resolution (`getaddrinfo() thread failed to start`); a retry outside that sandbox succeeded in a separate `strata-sage-research` checkout. Its HEAD is `379f095027097937f28c5c009cacbbb66504d957`. Pinned source files and PR metadata were also read through the GitHub connector.
 
 ## Local build investigation — October 31 update
 
-An isolated Release build configured successfully with CUDA 13.0.88, MSVC 19.44,
-architecture 75, native experts and Q6_K enabled, and the same pinned ggml source
-`3cf03257f219afbe7334045ff7c6a06ac68c627d`. At this publication, compilation is
-still running; no successful full build, model execution or speed result is claimed.
+The isolated Windows Release/SM75 build completed successfully with native experts and Q6_K enabled and pinned ggml `3cf03257f219afbe7334045ff7c6a06ac68c627d`. The exact model header has 60 Q4_K `ssm_alpha` / `ssm_beta` tensors; the local patch widens their represented values through ggml rather than modifying the model. A targeted CPU decoder test passed. In a short no-MTP, FP16-KV smoke, the unchanged Sage IQ4_XS GGUF loaded with all routed experts resident and 16 freely generated token IDs matched the earlier PolyStrata fixture. This does not establish full-logit equivalence or throughput gains. See the [build and smoke report](STRATA_SAGE_FORK_BUILD_2026-10-31.md) and [portable patch](../research/strata-sage/q36-q4k-upload.patch).
 
-The exact local model header establishes a loader blocker: all 60 `ssm_alpha`
-and `ssm_beta` tensors are Q4_K with shape `[2048,32]`. This fork's `upload_f32`
-accepts only F32, BF16, F16 and Q8_0. A local loader patch uses the pinned ggml
-Q4_K decoder to widen the values already represented by those blocks to FP32.
-It does not replace them with another checkpoint's BF16 values or rewrite the
-GGUF. A focused CPU fixture covers packed nibble order, signed scale, nonzero
-minima, high scale/minimum bits, guarded outputs and invalid sizes. Those code
-changes are not qualified until the build and tests finish. The existing tested
-PolyStrata binary and model remain the benchmark reference.
-
-The fork's [expert format lists](https://github.com/xyehya/Strata/blob/379f095027097937f28c5c009cacbbb66504d957/src/kernels/cuda/iq_kernels.cu#L762-L773) include ggml tensor type 23 (IQ4_XS) in both gate/up and down lists. This is stronger than a generic architecture claim, but the exact Sage file's loader, tensor geometry, remaining weights, Q8_1 layout, build options and SM75 runtime still need validation; no exact-file inference is reported here. Q6_K expert support is build-option dependent (`STRATA_Q6K_EXPERTS`), relevant to the model's MTP tensors if that path reaches these experts.
-
+The fork's [expert format lists](https://github.com/xyehya/Strata/blob/379f095027097937f28c5c009cacbbb66504d957/src/kernels/cuda/iq_kernels.cu#L762-L773) include ggml type 23 (IQ4_XS) for both gate/up and down. This short execution demonstrates that the tested file's load and generation path runs on this SM75 setup. Q6_K support is build-option dependent. Full-model numerical quality, occupied-context behavior, graph replay and MTP remain to be assessed.

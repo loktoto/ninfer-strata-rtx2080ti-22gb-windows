@@ -60,7 +60,7 @@ the pinned `tools/strata_tokenizer.py --gguf <file> --out <run>/pack`.
 It requires the exported vocabulary, merges, tokenizer metadata and the GGUF's
 own nonempty `chat_template.jinja`. If the GGUF has no template it stops; no
 replacement tokenizer or generic template is chosen. This follows the upstream
-[existing-architecture procedure](../.deps/PolyStrata/docs/BACKENDS.md#adding-a-model-of-an-architecture-that-is-there)
+[existing-architecture procedure](https://github.com/VecSzn/PolyStrata/blob/52c31cfcb55d7e42506a57757886af73f9547314/docs/BACKENDS.md#adding-a-model-of-an-architecture-that-is-there)
 for Sage's `qwen35moe` architecture.
 
 The saved `strata-sage.json` contains absolute paths for `exe`, `cwd`, `tokenizer`
