@@ -1,0 +1,1000 @@
+diff --git a/src/ops/moe_experts/moe_experts_gguf.cu b/src/ops/moe_experts/moe_experts_gguf.cu
+index 25444464..ac580fea 100644
+--- a/src/ops/moe_experts/moe_experts_gguf.cu
++++ b/src/ops/moe_experts/moe_experts_gguf.cu
+@@ -22,300 +22,12 @@
+ #include <string>
+ 
+ namespace ninfer::ops {
+-namespace {
+-
+-constexpr int kHidden  = 2560;
+-constexpr int kWidth   = 640;
+-constexpr int kExperts = 512;
+-constexpr int kTopK    = 10;
+-// Wider calls over device-resident banks take the matrix kernel.
++namespace flash_gguf_detail {
++constexpr int kHidden = 2560, kWidth = 640, kExperts = 512, kTopK = 10;
+ constexpr int kVectorTokens = 8;
+-
+-void require(bool condition, const char* message) {
+-    if (!condition) { throw std::invalid_argument(std::string("moe_experts_gguf: ") + message); }
+-}
+-
+-bool shaped(const Tensor& tensor, DType dtype, std::int32_t n0, std::int32_t n1) {
+-    return tensor.dtype == dtype && tensor.is_contiguous() && tensor.data != nullptr &&
+-           tensor.ne[0] == n0 && tensor.ne[1] == n1 && tensor.ne[2] == 1 && tensor.ne[3] == 1;
+-}
+-
+-// How many of one expert's columns share a pass over its rows, from the average it gets.
+-int chunk_for(std::int64_t pairs, std::int64_t experts) {
+-    const std::int64_t average = (pairs + experts - 1) / experts;
+-    return average >= 6 ? 8 : average >= 3 ? 4 : average >= 2 ? 2 : 1;
+-}
+-
+-gguf::MoeTable table(const GgufExpertTable& bank, int rows, int k) {
+-    require(bank.experts != nullptr && bank.row_bytes > 0, "an expert table is empty");
+-    return gguf::MoeTable{bank.experts, bank.row_bytes, rows, k};
+-}
+-
+-bool fusable(const GgufExpertTable& gate, const GgufExpertTable& up) {
+-    return gate.format == up.format && gate.row_bytes == up.row_bytes;
+-}
+-
+-// out = silu(gate) * up, rounded to BF16, over [pairs][rows] planes: the vector kernels' SiLU
+-// (ops/common/silu.h), so every path computes the same middle.
+-__global__ void swiglu_kernel(const float* __restrict__ gate, const float* __restrict__ up,
+-                              __nv_bfloat16* __restrict__ out, std::int64_t count) {
+-    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+-    if (i >= count) { return; }
+-    out[i] = __float2bfloat16(portable_silu(gate[i]) * up[i]);
+-}
+-
+-// fixed[t][r] += each of token t's pairs' contribution weights[p] * down[p][r] in 2^-32 fixed
+-// point, rounded per pair as the vector products round it. One thread per (token, row).
+-__global__ void accumulate_fixed_kernel(const float* __restrict__ down,
+-                                        const float* __restrict__ weights,
+-                                        const std::int32_t* __restrict__ ids, int per_token,
+-                                        int rows, std::int64_t count,
+-                                        unsigned long long* __restrict__ fixed) {
+-    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+-    if (i >= count) { return; }
+-    const std::int64_t t = i / rows, r = i % rows;
+-    long long sum = 0;
+-    for (int j = 0; j < per_token; ++j) {
+-        const std::int64_t p = t * per_token + j;
+-        if (ids[p] < 0) { continue; } // a pair another stage adds
+-        sum += fixed_product(down[p * rows + r], weights[p]);
+-    }
+-    fixed[i] += static_cast<unsigned long long>(sum);
+-}
+-
+-// y[t][r] = the 2^-32 fixed-point sum plus the external products of token t's pairs (each rounded
+-// per pair as the kernels round theirs). One thread per (token, row).
+-__global__ void decode_store_kernel(const unsigned long long* __restrict__ fixed,
+-                                    const float* __restrict__ products,
+-                                    const std::int32_t* __restrict__ pairs,
+-                                    const std::int32_t* __restrict__ count,
+-                                    const float* __restrict__ weights, int tokens,
+-                                    float* __restrict__ y) {
+-    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+-    if (i >= std::int64_t(tokens) * kHidden) { return; }
+-    unsigned long long sum = fixed[i];
+-    if (products != nullptr) {
+-        const int t = int(i / kHidden), r = int(i % kHidden);
+-        const int n = *count;
+-        for (int j = 0; j < n; ++j) {
+-            const int pair = pairs[j];
+-            if (pair / kTopK != t) { continue; }
+-            sum += static_cast<unsigned long long>(
+-                fixed_product(products[std::int64_t(j) * kHidden + r], weights[pair]));
+-        }
+-    }
+-    y[i] = static_cast<float>(static_cast<double>(static_cast<long long>(sum)) *
+-                              (1.0 / 4294967296.0));
+-}
+-
+-__global__ void store_fixed_kernel(const unsigned long long* __restrict__ fixed,
+-                                   float* __restrict__ y, std::int64_t count) {
+-    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+-    if (i >= count) { return; }
+-    y[i] = static_cast<float>(static_cast<double>(static_cast<long long>(fixed[i])) *
+-                              (1.0 / 4294967296.0));
+-}
+-
+-// out[p] = ids[p] when it lies in [begin, end), else -1: the pairs of one device's experts.
+-__global__ void keep_range_kernel(const std::int32_t* __restrict__ ids, std::int32_t count,
+-                                  std::int32_t begin, std::int32_t end,
+-                                  std::int32_t* __restrict__ out) {
+-    const std::int32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+-    if (i >= count) { return; }
+-    const std::int32_t id = ids[i];
+-    out[i]                = id >= begin && id < end ? id : -1;
+-}
+-
+-constexpr int kMaxParts = 8;
+-
+-struct PartSet {
+-    const unsigned long long* part[kMaxParts];
+-    int count;
+-};
+-
+-// y[i] = the parts' fixed-point sum, stored as store_fixed_kernel stores one sum.
+-__global__ void combine_fixed_kernel(PartSet parts, float* __restrict__ y, std::int64_t count) {
+-    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+-    if (i >= count) { return; }
+-    unsigned long long sum = 0;
+-    for (int p = 0; p < parts.count; ++p) { sum += parts.part[p][i]; }
+-    y[i] =
+-        static_cast<float>(static_cast<double>(static_cast<long long>(sum)) * (1.0 / 4294967296.0));
+-}
+-
+-// fixed[pair's token][r] += weights[pair] * values[i][r] for the listed pairs, rounded per pair
+-// as the vector products round theirs. One block row per listed pair.
+-__global__ void add_products_kernel(const float* __restrict__ values,
+-                                    const std::int32_t* __restrict__ pairs,
+-                                    const std::int32_t* __restrict__ count, int per_token,
+-                                    const float* __restrict__ weights,
+-                                    unsigned long long* __restrict__ fixed) {
+-    const int i = blockIdx.y;
+-    if (i >= *count) { return; }
+-    const int pair = pairs[i];
+-    for (int r = blockIdx.x * blockDim.x + threadIdx.x; r < kHidden; r += gridDim.x * blockDim.x) {
+-        atomicAdd(fixed + std::int64_t(pair / per_token) * kHidden + r,
+-                  static_cast<unsigned long long>(
+-                      fixed_product(values[std::int64_t(i) * kHidden + r], weights[pair])));
+-    }
+-}
+-
+-struct Plan {
+-    std::int32_t tokens = 0;
+-    std::int32_t pairs  = 0;
+-};
+-
+-bool matrix_path(std::int32_t tokens, bool device_resident, const GgufExpertTable& table, int rows,
+-                 int k) {
+-    return tokens > kVectorTokens && device_resident &&
+-           gguf::moe_matrix_supported(detail::gguf_type(table.format), rows, k, true);
+-}
+-
+-// One bank's pass: the middle of every pair, then its weighted down product into `fixed`.
+-void run_bank(const Tensor& routing_ids, std::int32_t pairs, std::int32_t experts, int per_token,
+-              const float* pair_weights, const __nv_bfloat16* m, const void* activation,
+-              std::int32_t tokens, const GgufExpertTable& gate, const GgufExpertTable& up,
+-              const GgufExpertTable& down, bool device_resident, WorkspaceArena& workspace,
+-              unsigned long long* fixed, cudaStream_t stream) {
+-    auto scope           = workspace.scope();
+-    Tensor routing_bytes = workspace.alloc(
+-        DType::U8, {static_cast<std::int32_t>(gguf::moe_routing_bytes(experts, pairs))});
+-    const gguf::MoeRouting routing =
+-        gguf::moe_sort_routes(static_cast<const std::int32_t*>(routing_ids.data), pairs, experts,
+-                              routing_bytes.data, stream);
+-    const int active                = std::min(pairs, experts);
+-    const int chunk                 = chunk_for(pairs, active);
+-    Tensor middle                   = workspace.alloc(DType::BF16, {kWidth, pairs});
+-    auto* middle_p                  = static_cast<__nv_bfloat16*>(middle.data);
+-    const gguf::MoeTable gate_table = table(gate, kWidth, kHidden);
+-    const gguf::MoeTable up_table   = table(up, kWidth, kHidden);
+-    if (matrix_path(tokens, device_resident, gate, kWidth, kHidden) &&
+-        matrix_path(tokens, device_resident, up, kWidth, kHidden)) {
+-        // Each projection's pairs gathered in routing order and quantized for its schedule; an
+-        // expert receives at most one pair per token.
+-        auto planes          = workspace.scope();
+-        const auto gate_type = detail::gguf_type(gate.format),
+-                   up_type   = detail::gguf_type(up.format);
+-        const auto activation_bytes =
+-            static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kHidden, pairs));
+-        Tensor gate_x = workspace.alloc(DType::U8, {activation_bytes});
+-        gguf::quantize_moe_matrix_activation(gate_type, m, kHidden, routing, pairs, per_token,
+-                                             gate_x.data, stream);
+-        Tensor up_x = gate_x;
+-        if (gguf::matrix_activation_layout(up_type) != gguf::matrix_activation_layout(gate_type)) {
+-            up_x = workspace.alloc(DType::U8, {activation_bytes});
+-            gguf::quantize_moe_matrix_activation(up_type, m, kHidden, routing, pairs, per_token,
+-                                                 up_x.data, stream);
+-        }
+-        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, pairs});
+-        Tensor up_plane   = workspace.alloc(DType::FP32, {kWidth, pairs});
+-        gguf::moe_matrix_product(gate_type, gate_table, routing, active, pairs, true, gate_x.data,
+-                                 static_cast<float*>(gate_plane.data), stream);
+-        gguf::moe_matrix_product(up_type, up_table, routing, active, pairs, true, up_x.data,
+-                                 static_cast<float*>(up_plane.data), stream);
+-        const std::int64_t count = std::int64_t(kWidth) * pairs;
+-        swiglu_kernel<<<static_cast<unsigned>((count + 255) / 256), 256, 0, stream>>>(
+-            static_cast<const float*>(gate_plane.data), static_cast<const float*>(up_plane.data),
+-            middle_p, count);
+-        CUDA_CHECK(cudaGetLastError());
+-    } else if (fusable(gate, up)) {
+-        gguf::moe_vector_swiglu(detail::gguf_type(gate.format), gate_table, up_table, routing,
+-                                active, per_token, activation, tokens, middle_p, chunk, stream);
+-    } else {
+-        // Released before the down product's input, as moe_experts_gguf_workspace_bytes counts it.
+-        auto planes       = workspace.scope();
+-        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, pairs});
+-        auto* gate_p      = static_cast<float*>(gate_plane.data);
+-        gguf::moe_vector_product(detail::gguf_type(gate.format), gate_table, routing, active,
+-                                 per_token, per_token, activation, tokens,
+-                                 gguf::MoeOutput{.f32 = gate_p}, chunk, stream);
+-        gguf::moe_vector_product(detail::gguf_type(up.format), up_table, routing, active, per_token,
+-                                 per_token, activation, tokens,
+-                                 gguf::MoeOutput{.bf16 = middle_p, .gate = gate_p}, chunk, stream);
+-    }
+-    const auto down_type = detail::gguf_type(down.format);
+-    if (matrix_path(tokens, device_resident, down, kHidden, kWidth)) {
+-        // The middle in routing order, its 640 values padded to three 256-value steps.
+-        Tensor middle_x = workspace.alloc(
+-            DType::U8,
+-            {static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kWidth, pairs))});
+-        gguf::quantize_moe_matrix_activation(down_type, middle_p, kWidth, routing, pairs, 1,
+-                                             middle_x.data, stream);
+-        Tensor down_plane = workspace.alloc(DType::FP32, {kHidden, pairs});
+-        auto* down_p      = static_cast<float*>(down_plane.data);
+-        gguf::moe_matrix_product(down_type, table(down, kHidden, kWidth), routing, active, pairs,
+-                                 true, middle_x.data, down_p, stream);
+-        const std::int64_t count = std::int64_t(kHidden) * tokens;
+-        accumulate_fixed_kernel<<<static_cast<unsigned>((count + 255) / 256), 256, 0, stream>>>(
+-            down_p, pair_weights, static_cast<const std::int32_t*>(routing_ids.data), per_token,
+-            kHidden, count, fixed);
+-        CUDA_CHECK(cudaGetLastError());
+-        return;
+-    }
+-    Tensor middle_q = workspace.alloc(
+-        DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kWidth, pairs))});
+-    gguf::quantize_vector_activation(middle_p, kWidth, pairs, nullptr, middle_q.data, stream);
+-    gguf::moe_vector_product(
+-        down_type, table(down, kHidden, kWidth), routing, active, 1, per_token, middle_q.data,
+-        pairs, gguf::MoeOutput{.weighted = fixed, .weights = pair_weights}, chunk, stream);
+-}
+-
+-// The routing of a one-expert bank every token selects, laid out as moe_sort_routes lays it out
+-// (bounds [2], sorted [tokens], active [1], active count): no sort needed.
+-__global__ void shared_routing_kernel(std::int32_t* __restrict__ base, int tokens) {
+-    std::int32_t* bounds = base;
+-    std::int32_t* sorted = bounds + 2;
+-    std::int32_t* active = sorted + tokens;
+-    if (threadIdx.x == 0) {
+-        bounds[0] = 0;
+-        bounds[1] = tokens;
+-        active[0] = 0;
+-        active[1] = 1;
+-    }
+-    if (int(threadIdx.x) < tokens) { sorted[threadIdx.x] = int(threadIdx.x); }
+-}
+-
+-// run_bank's vector path for the shared expert of up to eight tokens, weighted into `fixed`.
+-// Its allocations stay in the caller's scope: the work may still run on a side stream after the
+-// call returns.
+-void run_shared_vector(const float* shared_weights, const void* activation, std::int32_t tokens,
+-                       const GgufMoeWeights& banks, WorkspaceArena& workspace,
+-                       unsigned long long* fixed, cudaStream_t stream) {
+-    Tensor routing_bytes = workspace.alloc(
+-        DType::U8, {static_cast<std::int32_t>(gguf::moe_routing_bytes(1, tokens))});
+-    auto* base = static_cast<std::int32_t*>(routing_bytes.data);
+-    shared_routing_kernel<<<1, 32, 0, stream>>>(base, tokens);
+-    CUDA_CHECK(cudaGetLastError());
+-    const gguf::MoeRouting routing{base, base + 2, base + 2 + tokens, base + 3 + tokens};
+-    const int chunk                 = chunk_for(tokens, 1);
+-    Tensor middle                   = workspace.alloc(DType::BF16, {kWidth, tokens});
+-    auto* middle_p                  = static_cast<__nv_bfloat16*>(middle.data);
+-    const gguf::MoeTable gate_table = table(banks.shared_gate, kWidth, kHidden);
+-    const gguf::MoeTable up_table   = table(banks.shared_up, kWidth, kHidden);
+-    if (fusable(banks.shared_gate, banks.shared_up)) {
+-        gguf::moe_vector_swiglu(detail::gguf_type(banks.shared_gate.format), gate_table, up_table,
+-                                routing, 1, 1, activation, tokens, middle_p, chunk, stream);
+-    } else {
+-        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, tokens});
+-        auto* gate_p      = static_cast<float*>(gate_plane.data);
+-        gguf::moe_vector_product(detail::gguf_type(banks.shared_gate.format), gate_table, routing,
+-                                 1, 1, 1, activation, tokens, gguf::MoeOutput{.f32 = gate_p}, chunk,
+-                                 stream);
+-        gguf::moe_vector_product(detail::gguf_type(banks.shared_up.format), up_table, routing, 1, 1,
+-                                 1, activation, tokens,
+-                                 gguf::MoeOutput{.bf16 = middle_p, .gate = gate_p}, chunk, stream);
+-    }
+-    Tensor middle_q = workspace.alloc(
+-        DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kWidth, tokens))});
+-    gguf::quantize_vector_activation(middle_p, kWidth, tokens, nullptr, middle_q.data, stream);
+-    gguf::moe_vector_product(detail::gguf_type(banks.shared_down.format),
+-                             table(banks.shared_down, kHidden, kWidth), routing, 1, 1, 1,
+-                             middle_q.data, tokens,
+-                             gguf::MoeOutput{.weighted = fixed, .weights = shared_weights}, chunk,
+-                             stream);
+-}
+-
+-} // namespace
++#include "moe_experts_gguf_staged.cuh"
++} // namespace flash_gguf_detail
++using namespace flash_gguf_detail;
+ 
+ std::size_t moe_experts_gguf_workspace_bytes(std::int32_t tokens) {
+     require(tokens > 0, "tokens must be positive");
+diff --git a/src/ops/moe_experts/moe_experts_gguf_staged.cuh b/src/ops/moe_experts/moe_experts_gguf_staged.cuh
+new file mode 100644
+--- /dev/null
++++ b/src/ops/moe_experts/moe_experts_gguf_staged.cuh
+@@ -0,0 +1,285 @@
++// Shared GGUF expert kernels; include inside a geometry-specific private namespace.
++void require(bool condition, const char* message) {
++    if (!condition) { throw std::invalid_argument(std::string("moe_experts_gguf: ") + message); }
++}
++
++bool shaped(const Tensor& tensor, DType dtype, std::int32_t n0, std::int32_t n1) {
++    return tensor.dtype == dtype && tensor.is_contiguous() && tensor.data != nullptr &&
++           tensor.ne[0] == n0 && tensor.ne[1] == n1 && tensor.ne[2] == 1 && tensor.ne[3] == 1;
++}
++
++// How many of one expert's columns share a pass over its rows, from the average it gets.
++int chunk_for(std::int64_t pairs, std::int64_t experts) {
++    const std::int64_t average = (pairs + experts - 1) / experts;
++    return average >= 6 ? 8 : average >= 3 ? 4 : average >= 2 ? 2 : 1;
++}
++
++gguf::MoeTable table(const GgufExpertTable& bank, int rows, int k) {
++    require(bank.experts != nullptr && bank.row_bytes > 0, "an expert table is empty");
++    return gguf::MoeTable{bank.experts, bank.row_bytes, rows, k};
++}
++
++bool fusable(const GgufExpertTable& gate, const GgufExpertTable& up) {
++    return gate.format == up.format && gate.row_bytes == up.row_bytes;
++}
++
++// out = silu(gate) * up, rounded to BF16, over [pairs][rows] planes: the vector kernels' SiLU
++// (ops/common/silu.h), so every path computes the same middle.
++__global__ void swiglu_kernel(const float* __restrict__ gate, const float* __restrict__ up,
++                              __nv_bfloat16* __restrict__ out, std::int64_t count) {
++    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= count) { return; }
++    out[i] = __float2bfloat16(portable_silu(gate[i]) * up[i]);
++}
++
++// fixed[t][r] += each of token t's pairs' contribution weights[p] * down[p][r] in 2^-32 fixed
++// point, rounded per pair as the vector products round it. One thread per (token, row).
++__global__ void accumulate_fixed_kernel(const float* __restrict__ down,
++                                        const float* __restrict__ weights,
++                                        const std::int32_t* __restrict__ ids, int per_token,
++                                        int rows, std::int64_t count,
++                                        unsigned long long* __restrict__ fixed) {
++    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= count) { return; }
++    const std::int64_t t = i / rows, r = i % rows;
++    long long sum = 0;
++    for (int j = 0; j < per_token; ++j) {
++        const std::int64_t p = t * per_token + j;
++        if (ids[p] < 0) { continue; } // a pair another stage adds
++        sum += fixed_product(down[p * rows + r], weights[p]);
++    }
++    fixed[i] += static_cast<unsigned long long>(sum);
++}
++
++// y[t][r] = the 2^-32 fixed-point sum plus the external products of token t's pairs (each rounded
++// per pair as the kernels round theirs). One thread per (token, row).
++__global__ void decode_store_kernel(const unsigned long long* __restrict__ fixed,
++                                    const float* __restrict__ products,
++                                    const std::int32_t* __restrict__ pairs,
++                                    const std::int32_t* __restrict__ count,
++                                    const float* __restrict__ weights, int tokens,
++                                    float* __restrict__ y) {
++    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= std::int64_t(tokens) * kHidden) { return; }
++    unsigned long long sum = fixed[i];
++    if (products != nullptr) {
++        const int t = int(i / kHidden), r = int(i % kHidden);
++        const int n = *count;
++        for (int j = 0; j < n; ++j) {
++            const int pair = pairs[j];
++            if (pair / kTopK != t) { continue; }
++            sum += static_cast<unsigned long long>(
++                fixed_product(products[std::int64_t(j) * kHidden + r], weights[pair]));
++        }
++    }
++    y[i] = static_cast<float>(static_cast<double>(static_cast<long long>(sum)) *
++                              (1.0 / 4294967296.0));
++}
++
++__global__ void store_fixed_kernel(const unsigned long long* __restrict__ fixed,
++                                   float* __restrict__ y, std::int64_t count) {
++    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= count) { return; }
++    y[i] = static_cast<float>(static_cast<double>(static_cast<long long>(fixed[i])) *
++                              (1.0 / 4294967296.0));
++}
++
++// out[p] = ids[p] when it lies in [begin, end), else -1: the pairs of one device's experts.
++__global__ void keep_range_kernel(const std::int32_t* __restrict__ ids, std::int32_t count,
++                                  std::int32_t begin, std::int32_t end,
++                                  std::int32_t* __restrict__ out) {
++    const std::int32_t i = blockIdx.x * blockDim.x + threadIdx.x;
++    if (i >= count) { return; }
++    const std::int32_t id = ids[i];
++    out[i]                = id >= begin && id < end ? id : -1;
++}
++
++constexpr int kMaxParts = 8;
++
++struct PartSet {
++    const unsigned long long* part[kMaxParts];
++    int count;
++};
++
++// y[i] = the parts' fixed-point sum, stored as store_fixed_kernel stores one sum.
++__global__ void combine_fixed_kernel(PartSet parts, float* __restrict__ y, std::int64_t count) {
++    const std::int64_t i = std::int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= count) { return; }
++    unsigned long long sum = 0;
++    for (int p = 0; p < parts.count; ++p) { sum += parts.part[p][i]; }
++    y[i] =
++        static_cast<float>(static_cast<double>(static_cast<long long>(sum)) * (1.0 / 4294967296.0));
++}
++
++// fixed[pair's token][r] += weights[pair] * values[i][r] for the listed pairs, rounded per pair
++// as the vector products round theirs. One block row per listed pair.
++__global__ void add_products_kernel(const float* __restrict__ values,
++                                    const std::int32_t* __restrict__ pairs,
++                                    const std::int32_t* __restrict__ count, int per_token,
++                                    const float* __restrict__ weights,
++                                    unsigned long long* __restrict__ fixed) {
++    const int i = blockIdx.y;
++    if (i >= *count) { return; }
++    const int pair = pairs[i];
++    for (int r = blockIdx.x * blockDim.x + threadIdx.x; r < kHidden; r += gridDim.x * blockDim.x) {
++        atomicAdd(fixed + std::int64_t(pair / per_token) * kHidden + r,
++                  static_cast<unsigned long long>(
++                      fixed_product(values[std::int64_t(i) * kHidden + r], weights[pair])));
++    }
++}
++
++struct Plan {
++    std::int32_t tokens = 0;
++    std::int32_t pairs  = 0;
++};
++
++bool matrix_path(std::int32_t tokens, bool device_resident, const GgufExpertTable& table, int rows,
++                 int k) {
++    return tokens > kVectorTokens && device_resident &&
++           gguf::moe_matrix_supported(detail::gguf_type(table.format), rows, k, true);
++}
++
++// One bank's pass: the middle of every pair, then its weighted down product into `fixed`.
++void run_bank(const Tensor& routing_ids, std::int32_t pairs, std::int32_t experts, int per_token,
++              const float* pair_weights, const __nv_bfloat16* m, const void* activation,
++              std::int32_t tokens, const GgufExpertTable& gate, const GgufExpertTable& up,
++              const GgufExpertTable& down, bool device_resident, WorkspaceArena& workspace,
++              unsigned long long* fixed, cudaStream_t stream) {
++    auto scope           = workspace.scope();
++    Tensor routing_bytes = workspace.alloc(
++        DType::U8, {static_cast<std::int32_t>(gguf::moe_routing_bytes(experts, pairs))});
++    const gguf::MoeRouting routing =
++        gguf::moe_sort_routes(static_cast<const std::int32_t*>(routing_ids.data), pairs, experts,
++                              routing_bytes.data, stream);
++    const int active                = std::min(pairs, experts);
++    const int chunk                 = chunk_for(pairs, active);
++    Tensor middle                   = workspace.alloc(DType::BF16, {kWidth, pairs});
++    auto* middle_p                  = static_cast<__nv_bfloat16*>(middle.data);
++    const gguf::MoeTable gate_table = table(gate, kWidth, kHidden);
++    const gguf::MoeTable up_table   = table(up, kWidth, kHidden);
++    if (matrix_path(tokens, device_resident, gate, kWidth, kHidden) &&
++        matrix_path(tokens, device_resident, up, kWidth, kHidden)) {
++        // Each projection's pairs gathered in routing order and quantized for its schedule; an
++        // expert receives at most one pair per token.
++        auto planes          = workspace.scope();
++        const auto gate_type = detail::gguf_type(gate.format),
++                   up_type   = detail::gguf_type(up.format);
++        const auto activation_bytes =
++            static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kHidden, pairs));
++        Tensor gate_x = workspace.alloc(DType::U8, {activation_bytes});
++        gguf::quantize_moe_matrix_activation(gate_type, m, kHidden, routing, pairs, per_token,
++                                             gate_x.data, stream);
++        Tensor up_x = gate_x;
++        if (gguf::matrix_activation_layout(up_type) != gguf::matrix_activation_layout(gate_type)) {
++            up_x = workspace.alloc(DType::U8, {activation_bytes});
++            gguf::quantize_moe_matrix_activation(up_type, m, kHidden, routing, pairs, per_token,
++                                                 up_x.data, stream);
++        }
++        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, pairs});
++        Tensor up_plane   = workspace.alloc(DType::FP32, {kWidth, pairs});
++        gguf::moe_matrix_product(gate_type, gate_table, routing, active, pairs, true, gate_x.data,
++                                 static_cast<float*>(gate_plane.data), stream);
++        gguf::moe_matrix_product(up_type, up_table, routing, active, pairs, true, up_x.data,
++                                 static_cast<float*>(up_plane.data), stream);
++        const std::int64_t count = std::int64_t(kWidth) * pairs;
++        swiglu_kernel<<<static_cast<unsigned>((count + 255) / 256), 256, 0, stream>>>(
++            static_cast<const float*>(gate_plane.data), static_cast<const float*>(up_plane.data),
++            middle_p, count);
++        CUDA_CHECK(cudaGetLastError());
++    } else if (fusable(gate, up)) {
++        gguf::moe_vector_swiglu(detail::gguf_type(gate.format), gate_table, up_table, routing,
++                                active, per_token, activation, tokens, middle_p, chunk, stream);
++    } else {
++        // Released before the down product's input, as moe_experts_gguf_workspace_bytes counts it.
++        auto planes       = workspace.scope();
++        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, pairs});
++        auto* gate_p      = static_cast<float*>(gate_plane.data);
++        gguf::moe_vector_product(detail::gguf_type(gate.format), gate_table, routing, active,
++                                 per_token, per_token, activation, tokens,
++                                 gguf::MoeOutput{.f32 = gate_p}, chunk, stream);
++        gguf::moe_vector_product(detail::gguf_type(up.format), up_table, routing, active, per_token,
++                                 per_token, activation, tokens,
++                                 gguf::MoeOutput{.bf16 = middle_p, .gate = gate_p}, chunk, stream);
++    }
++    const auto down_type = detail::gguf_type(down.format);
++    if (matrix_path(tokens, device_resident, down, kHidden, kWidth)) {
++        // The middle in routing order, its 640 values padded to three 256-value steps.
++        Tensor middle_x = workspace.alloc(
++            DType::U8,
++            {static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kWidth, pairs))});
++        gguf::quantize_moe_matrix_activation(down_type, middle_p, kWidth, routing, pairs, 1,
++                                             middle_x.data, stream);
++        Tensor down_plane = workspace.alloc(DType::FP32, {kHidden, pairs});
++        auto* down_p      = static_cast<float*>(down_plane.data);
++        gguf::moe_matrix_product(down_type, table(down, kHidden, kWidth), routing, active, pairs,
++                                 true, middle_x.data, down_p, stream);
++        const std::int64_t count = std::int64_t(kHidden) * tokens;
++        accumulate_fixed_kernel<<<static_cast<unsigned>((count + 255) / 256), 256, 0, stream>>>(
++            down_p, pair_weights, static_cast<const std::int32_t*>(routing_ids.data), per_token,
++            kHidden, count, fixed);
++        CUDA_CHECK(cudaGetLastError());
++        return;
++    }
++    Tensor middle_q = workspace.alloc(
++        DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kWidth, pairs))});
++    gguf::quantize_vector_activation(middle_p, kWidth, pairs, nullptr, middle_q.data, stream);
++    gguf::moe_vector_product(
++        down_type, table(down, kHidden, kWidth), routing, active, 1, per_token, middle_q.data,
++        pairs, gguf::MoeOutput{.weighted = fixed, .weights = pair_weights}, chunk, stream);
++}
++
++// The routing of a one-expert bank every token selects, laid out as moe_sort_routes lays it out
++// (bounds [2], sorted [tokens], active [1], active count): no sort needed.
++__global__ void shared_routing_kernel(std::int32_t* __restrict__ base, int tokens) {
++    std::int32_t* bounds = base;
++    std::int32_t* sorted = bounds + 2;
++    std::int32_t* active = sorted + tokens;
++    if (threadIdx.x == 0) {
++        bounds[0] = 0;
++        bounds[1] = tokens;
++        active[0] = 0;
++        active[1] = 1;
++    }
++    if (int(threadIdx.x) < tokens) { sorted[threadIdx.x] = int(threadIdx.x); }
++}
++
++// run_bank's vector path for the shared expert of up to eight tokens, weighted into `fixed`.
++// Its allocations stay in the caller's scope: the work may still run on a side stream after the
++// call returns.
++void run_shared_vector(const float* shared_weights, const void* activation, std::int32_t tokens,
++                       const GgufMoeWeights& banks, WorkspaceArena& workspace,
++                       unsigned long long* fixed, cudaStream_t stream) {
++    Tensor routing_bytes = workspace.alloc(
++        DType::U8, {static_cast<std::int32_t>(gguf::moe_routing_bytes(1, tokens))});
++    auto* base = static_cast<std::int32_t*>(routing_bytes.data);
++    shared_routing_kernel<<<1, 32, 0, stream>>>(base, tokens);
++    CUDA_CHECK(cudaGetLastError());
++    const gguf::MoeRouting routing{base, base + 2, base + 2 + tokens, base + 3 + tokens};
++    const int chunk                 = chunk_for(tokens, 1);
++    Tensor middle                   = workspace.alloc(DType::BF16, {kWidth, tokens});
++    auto* middle_p                  = static_cast<__nv_bfloat16*>(middle.data);
++    const gguf::MoeTable gate_table = table(banks.shared_gate, kWidth, kHidden);
++    const gguf::MoeTable up_table   = table(banks.shared_up, kWidth, kHidden);
++    if (fusable(banks.shared_gate, banks.shared_up)) {
++        gguf::moe_vector_swiglu(detail::gguf_type(banks.shared_gate.format), gate_table, up_table,
++                                routing, 1, 1, activation, tokens, middle_p, chunk, stream);
++    } else {
++        Tensor gate_plane = workspace.alloc(DType::FP32, {kWidth, tokens});
++        auto* gate_p      = static_cast<float*>(gate_plane.data);
++        gguf::moe_vector_product(detail::gguf_type(banks.shared_gate.format), gate_table, routing,
++                                 1, 1, 1, activation, tokens, gguf::MoeOutput{.f32 = gate_p}, chunk,
++                                 stream);
++        gguf::moe_vector_product(detail::gguf_type(banks.shared_up.format), up_table, routing, 1, 1,
++                                 1, activation, tokens,
++                                 gguf::MoeOutput{.bf16 = middle_p, .gate = gate_p}, chunk, stream);
++    }
++    Tensor middle_q = workspace.alloc(
++        DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kWidth, tokens))});
++    gguf::quantize_vector_activation(middle_p, kWidth, tokens, nullptr, middle_q.data, stream);
++    gguf::moe_vector_product(detail::gguf_type(banks.shared_down.format),
++                             table(banks.shared_down, kHidden, kWidth), routing, 1, 1, 1,
++                             middle_q.data, tokens,
++                             gguf::MoeOutput{.weighted = fixed, .weights = shared_weights}, chunk,
++                             stream);
++}
++
+diff --git a/src/ops/moe_experts/moe_experts_sage_experimental.cu b/src/ops/moe_experts/moe_experts_sage_experimental.cu
+new file mode 100644
+--- /dev/null
++++ b/src/ops/moe_experts/moe_experts_sage_experimental.cu
+@@ -0,0 +1,89 @@
++// Experimental Sage-shaped GGUF MoE. Shares the Flash-Next staged kernels,
++// but never calls its 2560/640-specific fused decode bridge.
++#include "ninfer/ops/moe_experts_sage_experimental.h"
++#include "core/device.h"
++#include "core/layout.h"
++#include "ops/common/fixed_point.cuh"
++#include "ops/common/silu.h"
++#include "ops/linear/gguf/gguf_linear.h"
++#include <cuda_bf16.h>
++#include <cuda_fp16.h>
++#include <algorithm>
++#include <cstdint>
++#include <stdexcept>
++#include <string>
++
++namespace ninfer::ops {
++namespace sage_gguf_detail {
++constexpr int kHidden = 2048, kWidth = 512, kExperts = 256, kTopK = 8;
++constexpr int kVectorTokens = 8;
++#include "moe_experts_gguf_staged.cuh"
++}
++namespace sage {
++using namespace sage_gguf_detail;
++
++std::size_t workspace_bytes(std::int32_t tokens) {
++    require(tokens > 0 && tokens <= 65535 / kTopK, "invalid token count");
++    const std::int32_t pairs = tokens * kTopK;
++    WorkspaceLayoutBuilder layout;
++    (void)layout.alloc(DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kHidden, tokens))});
++    (void)layout.alloc(DType::I64, {kHidden, tokens});
++    (void)layout.alloc(DType::I32, {tokens});
++    (void)layout.alloc(DType::U8, {static_cast<std::int32_t>(gguf::moe_routing_bytes(kExperts, pairs))});
++    (void)layout.alloc(DType::BF16, {kWidth, pairs});
++    {
++        auto planes = layout.scope();
++        if (tokens > kVectorTokens) {
++            const auto bytes = static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kHidden, pairs));
++            (void)layout.alloc(DType::U8, {bytes});
++            (void)layout.alloc(DType::U8, {bytes});
++            (void)layout.alloc(DType::FP32, {kWidth, pairs});
++        }
++        (void)layout.alloc(DType::FP32, {kWidth, pairs});
++    }
++    (void)layout.alloc(DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kWidth, pairs))});
++    if (tokens > kVectorTokens) {
++        (void)layout.alloc(DType::U8, {static_cast<std::int32_t>(gguf::moe_matrix_activation_bytes(kWidth, pairs))});
++        (void)layout.alloc(DType::FP32, {kHidden, pairs});
++    }
++    return layout.peak_bytes(1);
++}
++
++void experts(const Tensor& m, const Tensor& ids, const Tensor& weights,
++             const Tensor& shared, const GgufMoeWeights& banks,
++             WorkspaceArena& workspace, Tensor& y, cudaStream_t stream) {
++    const std::int32_t tokens = m.ne[1];
++    require(tokens > 0 && tokens <= 65535 / kTopK, "invalid token count");
++    require(shaped(m, DType::BF16, kHidden, tokens), "m must be BF16 [2048,T]");
++    require(shaped(ids, DType::I32, kTopK, tokens), "ids must be I32 [8,T]");
++    require(shaped(weights, DType::FP32, kTopK, tokens), "weights must be FP32 [8,T]");
++    require(shaped(y, DType::FP32, kHidden, tokens), "y must be FP32 [2048,T]");
++    require(shared.dtype == DType::FP32 && shared.is_contiguous() && shared.data &&
++            shared.numel() == tokens, "shared must be FP32 [T]");
++    require(banks.experts == kExperts, "Sage requires 256 expert table entries");
++    auto outer = workspace.scope();
++    Tensor activation = workspace.alloc(DType::U8, {static_cast<std::int32_t>(gguf::vector_activation_bytes(kHidden, tokens))});
++    gguf::quantize_vector_activation(static_cast<const __nv_bfloat16*>(m.data), kHidden,
++                                     tokens, nullptr, activation.data, stream);
++    Tensor fixed = workspace.alloc(DType::I64, {kHidden, tokens});
++    CUDA_CHECK(cudaMemsetAsync(fixed.data, 0, fixed.bytes(), stream));
++    auto* sums = static_cast<unsigned long long*>(fixed.data);
++    const auto* input = static_cast<const __nv_bfloat16*>(m.data);
++    run_bank(ids, tokens * kTopK, kExperts, kTopK, static_cast<const float*>(weights.data),
++             input, activation.data, tokens, banks.gate, banks.up, banks.down,
++             banks.device_resident, workspace, sums, stream);
++    {
++        auto scope = workspace.scope();
++        Tensor shared_ids = workspace.alloc(DType::I32, {tokens});
++        CUDA_CHECK(cudaMemsetAsync(shared_ids.data, 0, shared_ids.bytes(), stream));
++        run_bank(shared_ids, tokens, 1, 1, static_cast<const float*>(shared.data),
++                 input, activation.data, tokens, banks.shared_gate, banks.shared_up,
++                 banks.shared_down, banks.device_resident, workspace, sums, stream);
++    }
++    const std::int64_t count = std::int64_t(kHidden) * tokens;
++    store_fixed_kernel<<<static_cast<unsigned>((count + 255) / 256), 256, 0, stream>>>(
++        sums, static_cast<float*>(y.data), count);
++    CUDA_CHECK(cudaGetLastError());
++}
++} // namespace sage
++} // namespace ninfer::ops
+diff --git a/include/ninfer/ops/moe_experts_sage_experimental.h b/include/ninfer/ops/moe_experts_sage_experimental.h
+new file mode 100644
+--- /dev/null
++++ b/include/ninfer/ops/moe_experts_sage_experimental.h
+@@ -0,0 +1,11 @@
++#pragma once
++#include "ninfer/ops/moe_experts.h"
++
++// Experimental Sage-shaped resident GGUF expert operation. Not registered in
++// the production build until its CUDA oracle and model binding are qualified.
++namespace ninfer::ops::sage {
++[[nodiscard]] std::size_t workspace_bytes(std::int32_t tokens);
++void experts(const Tensor& m, const Tensor& ids, const Tensor& weights,
++             const Tensor& shared, const GgufMoeWeights& banks,
++             WorkspaceArena& workspace, Tensor& y, cudaStream_t stream);
++}
+diff --git a/tests/ops/test_moe_experts_gguf.cpp b/tests/ops/test_moe_experts_gguf.cpp
+index 31996048..445207c9 100644
+--- a/tests/ops/test_moe_experts_gguf.cpp
++++ b/tests/ops/test_moe_experts_gguf.cpp
+@@ -17,6 +17,9 @@
+ #include "core/tensor.h"
+ #include "core/weight.h"
+ #include "ninfer/ops/moe_experts.h"
++#ifdef NINFER_SAGE_GGUF_EXPERIMENT
++#include "ninfer/ops/moe_experts_sage_experimental.h"
++#endif
+ #include "ops/linear/gguf/ggml_bridge.h"
+ #include "ops/linear/gguf/gguf_linear.h"
+ #include "ops/moe_experts/gguf_expert_cpu.h"
+@@ -39,7 +42,64 @@ namespace {
+ 
+ using namespace ninfer;
+ 
++#ifdef NINFER_SAGE_GGUF_EXPERIMENT
++constexpr int kHidden = 2048, kWidth = 512, kExperts = 256, kTopK = 8;
++#else
+ constexpr int kHidden = 2560, kWidth = 640, kExperts = 512, kTopK = 10;
++#endif
++
++// Independent IQ4_XS decoder for the routed expert oracle; no device decoder
++// participates in construction of these reference weights.
++float exact_iq4_xs(const std::uint8_t* b, int element) {
++    constexpr int values[16] = {-127, -104, -83, -65, -49, -35, -22, -10,
++                                 1, 13, 25, 38, 53, 69, 89, 113};
++    const std::uint16_t bits = std::uint16_t(b[0]) | (std::uint16_t(b[1]) << 8);
++    const int exponent = (bits >> 10) & 31, fraction = bits & 1023;
++    if (exponent == 31) { throw std::runtime_error("nonfinite IQ4_XS scale"); }
++    const double magnitude = exponent ? std::ldexp(1024.0 + fraction, exponent - 25)
++                                      : std::ldexp(double(fraction), -24);
++    const double d = bits & 0x8000 ? -magnitude : magnitude;
++    const int sub = element / 32, index = element % 32;
++    const unsigned high = unsigned(b[2]) | (unsigned(b[3]) << 8);
++    const unsigned low = (b[4 + sub / 2] >> (4 * (sub % 2))) & 15;
++    const int scale = int(low | (((high >> (2 * sub)) & 3) << 4)) - 32;
++    const unsigned packed = b[8 + 16 * sub + index % 16];
++    const unsigned code = index < 16 ? packed & 15 : packed >> 4;
++    return float(d * scale * values[code]);
++}
++
++double exact_half_word(const std::uint8_t* b) {
++    const unsigned bits = unsigned(b[0]) | (unsigned(b[1]) << 8);
++    const int exponent = (bits >> 10) & 31, fraction = bits & 1023;
++    if (exponent == 31) { throw std::runtime_error("nonfinite scale in fixture"); }
++    const double magnitude = exponent ? std::ldexp(1024.0 + fraction, exponent - 25)
++                                      : std::ldexp(double(fraction), -24);
++    return bits & 0x8000 ? -magnitude : magnitude;
++}
++
++// CPU reference for Sage's Q4_K/Q6_K shared weights; layout follows ggml's
++// documented block definitions, independently of the GPU dequantizer.
++float exact_sage_shared(QType q, const std::uint8_t* b, int element) {
++    if (q == QType::GGUF_Q4_K) {
++        const int sub = element / 32, j = element % 32;
++        const std::uint8_t* scales = b + 4;
++        const int scale = sub < 4 ? scales[sub] & 63
++                                  : (scales[sub + 4] & 15) | ((scales[sub - 4] >> 6) << 4);
++        const int minimum = sub < 4 ? scales[sub + 4] & 63
++                                    : (scales[sub + 4] >> 4) | ((scales[sub] >> 6) << 4);
++        const unsigned packed = b[16 + (sub / 2) * 32 + j];
++        const unsigned code = sub % 2 ? packed >> 4 : packed & 15;
++        return float(exact_half_word(b) * scale * code - exact_half_word(b + 2) * minimum);
++    }
++    const int half = element / 128, within = element % 128;
++    const int sub = within / 32, lane = within % 32;
++    const unsigned low = b[half * 64 + (sub % 2) * 32 + lane];
++    const unsigned high = b[128 + half * 32 + lane];
++    const int code = int((sub < 2 ? low & 15 : low >> 4) | (((high >> (2 * sub)) & 3) << 4)) - 32;
++    const unsigned scale_byte = b[192 + half * 8 + sub * 2 + lane / 16];
++    const int scale = scale_byte < 128 ? int(scale_byte) : int(scale_byte) - 256;
++    return float(exact_half_word(b + 208) * scale * code);
++}
+ 
+ // Independent stored Q2_0 decoder: binary16 multiplier and four adjacent 2-bit codes per byte.
+ // Do not use the production GPU decoder to construct this format's mathematical oracle.
+@@ -147,6 +207,18 @@ struct Bank {
+                     exact.back()[element] = exact_q2_0(bytes.data() + (element / 64) * 18,
+                                                        int(element % 64));
+                 }
++            } else if (q == QType::GGUF_IQ4_XS) {
++                for (std::size_t element = 0; element < exact.back().size(); ++element) {
++                    exact.back()[element] = exact_iq4_xs(bytes.data() + (element / 256) * 136,
++                                                         int(element % 256));
++                }
++#ifdef NINFER_SAGE_GGUF_EXPERIMENT
++            } else if (q == QType::GGUF_Q4_K || q == QType::GGUF_Q6_K) {
++                for (std::size_t element = 0; element < exact.back().size(); ++element) {
++                    exact.back()[element] = exact_sage_shared(
++                        q, bytes.data() + (element / 256) * block.bytes, int(element % 256));
++                }
++#endif
+             } else {
+                 DeviceBuffer values(std::size_t(rows) * k * sizeof(float));
+                 ops::gguf::dequantize_rows(ops::detail::gguf_type(q), matrices.back().p, row_bytes, k,
+@@ -276,13 +348,22 @@ int run_case(const Case& c, std::uint32_t seed) {
+         Tensor t_m(d_m.p, DType::BF16, {kHidden, tokens}),
+             t_ids(d_ids.p, DType::I32, {kTopK, tokens}), t_w(d_w.p, DType::FP32, {kTopK, tokens}),
+             t_s(d_s.p, DType::FP32, {tokens}), t_y(d_y.p, DType::FP32, {kHidden, tokens});
++        #ifdef NINFER_SAGE_GGUF_EXPERIMENT
++        WorkspaceArena workspace(ops::sage::workspace_bytes(tokens));
++        ops::sage::experts(t_m, t_ids, t_w, t_s, banks, workspace, t_y, nullptr);
++        #else
+         WorkspaceArena workspace(ops::moe_experts_gguf_workspace_bytes(tokens) + (1U << 20));
+         ops::moe_experts_gguf(t_m, t_ids, t_w, t_s, banks, workspace, t_y, nullptr);
++        #endif
+         check(cudaDeviceSynchronize(), "moe_experts_gguf");
+         std::vector<float> got(std::size_t(kHidden) * tokens);
+         d_y.copy_to_host(got.data(), got.size() * 4);
+         // A second run must reproduce every bit: the accumulation is order independent.
++        #ifdef NINFER_SAGE_GGUF_EXPERIMENT
++        ops::sage::experts(t_m, t_ids, t_w, t_s, banks, workspace, t_y, nullptr);
++        #else
+         ops::moe_experts_gguf(t_m, t_ids, t_w, t_s, banks, workspace, t_y, nullptr);
++        #endif
+         check(cudaDeviceSynchronize(), "moe_experts_gguf repeat");
+         std::vector<float> again(got.size());
+         d_y.copy_to_host(again.data(), again.size() * 4);
+@@ -291,6 +372,39 @@ int run_case(const Case& c, std::uint32_t seed) {
+                       << (device_resident ? " matrix" : " vector") << ": a repeat differs\n";
+             ++failures;
+         }
++#ifdef NINFER_SAGE_GGUF_EXPERIMENT
++        // The caller owns the workspace for the captured graph's lifetime.
++        // Verify replay, including the vector/matrix boundary, against the
++        // already oracle-checked eager result, and require scopes to unwind.
++        if (workspace.used() != 0) {
++            std::cerr << "FAIL Sage workspace scope leaked before capture\n";
++            ++failures;
++        }
++        cudaStream_t capture_stream = nullptr;
++        cudaGraph_t graph = nullptr;
++        cudaGraphExec_t executable = nullptr;
++        check(cudaStreamCreateWithFlags(&capture_stream, cudaStreamNonBlocking), "Sage capture stream");
++        check(cudaStreamBeginCapture(capture_stream, cudaStreamCaptureModeGlobal), "Sage begin capture");
++        ops::sage::experts(t_m, t_ids, t_w, t_s, banks, workspace, t_y, capture_stream);
++        check(cudaStreamEndCapture(capture_stream, &graph), "Sage end capture");
++        check(cudaGraphInstantiate(&executable, graph, nullptr, nullptr, 0), "Sage instantiate");
++        bool graph_equal = true;
++        for (int replay = 0; replay < 2; ++replay) {
++            check(cudaGraphLaunch(executable, capture_stream), "Sage graph launch");
++            check(cudaStreamSynchronize(capture_stream), "Sage graph sync");
++            d_y.copy_to_host(again.data(), again.size() * 4);
++            graph_equal &= std::memcmp(got.data(), again.data(), got.size() * 4) == 0;
++        }
++        graph_equal &= workspace.used() == 0;
++        std::cout << (graph_equal ? "OK   " : "FAIL ") << c.name << " T=" << tokens
++                  << (device_resident ? " resident" : " vector")
++                  << " graph replays=2 workspace_released=" << (workspace.used() == 0) << '\n';
++        failures += graph_equal ? 0 : 1;
++        check(cudaGraphExecDestroy(executable), "Sage destroy graph exec");
++        check(cudaGraphDestroy(graph), "Sage destroy graph");
++        check(cudaStreamDestroy(capture_stream), "Sage destroy stream");
++#endif
++#ifndef NINFER_SAGE_GGUF_EXPERIMENT
+         {
+             // Expert parallelism: parts over range tables, the shared expert in the first, or in
+             // a later one, combine to the whole call's y bit for bit.
+@@ -340,6 +454,8 @@ int run_case(const Case& c, std::uint32_t seed) {
+                 failures += same ? 0 : 1;
+             }
+         }
++#endif
++#ifndef NINFER_SAGE_GGUF_EXPERIMENT
+         if (ops::moe_experts_gguf_decode_supported(banks, tokens)) {
+             // The decode form must equal the separate kernels bit for bit, whole and split into a
+             // first stage and a second (the even and odd pairs) as missing experts are served.
+@@ -459,6 +575,7 @@ int run_case(const Case& c, std::uint32_t seed) {
+                 failures += differ == 0 ? 0 : 1;
+             }
+         }
++#endif
+         double num = 0, den = 0, worst = 0, scale = 0;
+         for (int t = 0; t < tokens; ++t) {
+             std::vector<float> x(kHidden);
+@@ -509,6 +626,13 @@ int main() {
+     try {
+         using Q                       = QType;
+         const std::vector<Case> cases = {
++#ifdef NINFER_SAGE_GGUF_EXPERIMENT
++            // Sage's actual routed and shared codecs. T=1 exercises decode,
++            // T=9 crosses the staged prefill frontier. The unqualified probe
++            // deliberately cannot take Flash-Next's fixed-shape decode path.
++            {"sage iq4_xs", Q::GGUF_IQ4_XS, Q::GGUF_IQ4_XS, Q::GGUF_IQ4_XS,
++             Q::GGUF_Q4_K, Q::GGUF_Q4_K, Q::GGUF_Q6_K, 2, {1, 8, 9}, kExperts},
++#else
+             // The GSQ-RCO Q2_0 release: fused Q2_0 gate/up, Q2_0 down, a mixed shared expert.
+             {"q2_0 bank",
+              Q::GGUF_Q2_0,
+@@ -608,6 +732,7 @@ int main() {
+              2,
+              {8, 24},
+              12},
++#endif
+         };
+         int failures       = 0;
+         std::uint32_t seed = 4242;
+diff --git a/tests/ops/test_moe_experts_sage_experimental.cpp b/tests/ops/test_moe_experts_sage_experimental.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/ops/test_moe_experts_sage_experimental.cpp
+@@ -0,0 +1,3 @@
++// Experimental Sage geometry qualification using the shared GGUF fixture.
++#define NINFER_SAGE_GGUF_EXPERIMENT 1
++#include "test_moe_experts_gguf.cpp"
+diff --git a/experiments/sage-op-compile/CMakeLists.txt b/experiments/sage-op-compile/CMakeLists.txt
+new file mode 100644
+--- /dev/null
++++ b/experiments/sage-op-compile/CMakeLists.txt
+@@ -0,0 +1,77 @@
++# Sage GGUF MoE operator qualification; this never builds the model runtime.
++cmake_minimum_required(VERSION 3.28)
++project(sage_moe_compile_probe LANGUAGES CXX CUDA)
++set(CMAKE_CXX_STANDARD 20)
++set(CMAKE_CUDA_STANDARD 20)
++set(CMAKE_CUDA_ARCHITECTURES 75)
++find_package(CUDAToolkit REQUIRED)
++get_filename_component(NINFER_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
++add_library(sage_moe_probe OBJECT "${NINFER_SOURCE}/src/ops/moe_experts/moe_experts_sage_experimental.cu")
++target_include_directories(sage_moe_probe PRIVATE "${NINFER_SOURCE}/include" "${NINFER_SOURCE}/src")
++target_compile_definitions(sage_moe_probe PRIVATE NINFER_SM8X_COMPAT=1)
++target_link_libraries(sage_moe_probe PRIVATE CUDA::cudart)
++add_library(sage_moe_oracle_probe OBJECT "${NINFER_SOURCE}/tests/ops/test_moe_experts_sage_experimental.cpp")
++set_source_files_properties("${NINFER_SOURCE}/tests/ops/test_moe_experts_sage_experimental.cpp"
++  PROPERTIES OBJECT_DEPENDS "${NINFER_SOURCE}/tests/ops/test_moe_experts_gguf.cpp")
++target_include_directories(sage_moe_oracle_probe PRIVATE "${NINFER_SOURCE}/include" "${NINFER_SOURCE}/src")
++target_compile_definitions(sage_moe_oracle_probe PRIVATE NINFER_SM8X_COMPAT=1)
++target_link_libraries(sage_moe_oracle_probe PRIVATE CUDA::cudart)
++
++# Optional link-only path. This uses NInfer's existing core/ops archives and
++# bundled ggml bridge directly; it does not configure media, FFmpeg or serving.
++# The archives are sizeable: request this target explicitly and build with -j1.
++option(SAGE_LINK_ORACLE "Build the experimental standalone CUDA oracle" OFF)
++if(SAGE_LINK_ORACLE)
++  find_package(Threads REQUIRED)
++  set(PROJECT_SOURCE_DIR "${NINFER_SOURCE}")
++  set(NINFER_COMPAT_PATH ON)
++  set(NINFER_ARCH_TURING ON)
++  set(NINFER_ARCH_BLACKWELL OFF)
++  set(NINFER_WINDOWS_KERNEL_DLL OFF)
++  set(NINFER_DIRECTSTORAGE OFF)
++  set(NINFER_CUDART_TARGET CUDA::cudart_static)
++  add_compile_definitions(NINFER_SM8X_COMPAT=1)
++  include("${NINFER_SOURCE}/cmake/NinferTargets.cmake")
++  add_subdirectory("${NINFER_SOURCE}/src/core" "${CMAKE_BINARY_DIR}/ninfer-core")
++  add_subdirectory("${NINFER_SOURCE}/src/ops" "${CMAKE_BINARY_DIR}/ninfer-ops")
++  add_executable(sage_moe_oracle $<TARGET_OBJECTS:sage_moe_probe> $<TARGET_OBJECTS:sage_moe_oracle_probe>)
++  set_target_properties(sage_moe_oracle PROPERTIES LINKER_LANGUAGE CUDA)
++  target_link_libraries(sage_moe_oracle PRIVATE ninfer_ops ninfer_core CUDA::cublas CUDA::cuda_driver CUDA::cudart_static)
++endif()
++# Regression compile of the unchanged Flash-Next entry points after extracting
++# the shared staged implementation. Object-only; this does not execute CUDA.
++add_library(flash_moe_regression_probe OBJECT "${NINFER_SOURCE}/src/ops/moe_experts/moe_experts_gguf.cu")
++target_include_directories(flash_moe_regression_probe PRIVATE "${NINFER_SOURCE}/include" "${NINFER_SOURCE}/src")
++target_compile_definitions(flash_moe_regression_probe PRIVATE NINFER_SM8X_COMPAT=1)
++target_link_libraries(flash_moe_regression_probe PRIVATE CUDA::cudart)
++
++# Minimal direct-source link experiment: only GGUF bridges, core objects and
++# Sage qualification. No media libraries or production engine/serving.
++option(SAGE_LINK_MINIMAL "Build Sage oracle using only direct dependencies" OFF)
++if(SAGE_LINK_MINIMAL)
++  file(GLOB SAGE_GGML_MATRIX "${NINFER_SOURCE}/src/ops/linear/gguf/ggml_mmq_*.cu")
++  file(GLOB SAGE_GGML_VECTOR "${NINFER_SOURCE}/src/ops/linear/gguf/ggml_vec_*.cu")
++  add_executable(sage_moe_minimal
++    $<TARGET_OBJECTS:sage_moe_probe> $<TARGET_OBJECTS:sage_moe_oracle_probe>
++    "${NINFER_SOURCE}/src/core/arena.cu"
++    "${NINFER_SOURCE}/src/core/device.cu"
++    "${NINFER_SOURCE}/src/core/device_launch.cpp"
++    "${NINFER_SOURCE}/src/core/peer_preflight.cpp"
++    "${NINFER_SOURCE}/src/core/tensor.cpp"
++    "${NINFER_SOURCE}/src/core/layout.cpp"
++    "${NINFER_SOURCE}/src/core/dtype.cpp"
++    "${NINFER_SOURCE}/src/core/weight_view.cpp"
++    "${NINFER_SOURCE}/src/ops/common/device_route.cpp"
++    "${NINFER_SOURCE}/src/ops/common/device_tier.cu"
++    "${NINFER_SOURCE}/src/ops/linear/gguf/ggml_bridge.cu"
++    "${NINFER_SOURCE}/src/ops/linear/gguf/gguf_linear.cpp"
++    "${NINFER_SOURCE}/src/ops/linear/sm70/sm70_gemm.cu"
++    ${SAGE_GGML_MATRIX} ${SAGE_GGML_VECTOR})
++  target_include_directories(sage_moe_minimal PRIVATE "${NINFER_SOURCE}/include" "${NINFER_SOURCE}/src"
++    "${NINFER_SOURCE}/third_party/ggml-quants/include" "${NINFER_SOURCE}/third_party/ggml-quants/src")
++  target_compile_definitions(sage_moe_minimal PRIVATE NINFER_SM8X_COMPAT=1 NINFER_TIER_TURING=1 NINFER_CUDA_ARCHITECTURES="75")
++  target_compile_options(sage_moe_minimal PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
++  target_link_libraries(sage_moe_minimal PRIVATE CUDA::cublas CUDA::cuda_driver CUDA::cudart_static delayimp)
++  target_link_options(sage_moe_minimal PRIVATE "$<HOST_LINK:/DELAYLOAD:nvcuda.dll>")
++  set_target_properties(sage_moe_minimal PROPERTIES LINKER_LANGUAGE CUDA CUDA_RUNTIME_LIBRARY Static)
++endif()
