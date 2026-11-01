@@ -1,11 +1,43 @@
 # NInfer standalone Sage progress — 31 October 2026
 
-The standalone NInfer comparison (C) remains **unmeasured**. The pinned [NInfer-all source](https://github.com/iamwavecut/ninfer-all/tree/71d3f8190772ef7089f8eda4e22371114fd5bbf9) has CUDA IQ4_XS building blocks, but its existing Qwen3.5 MoE runtime does not accept the GGUF expert profile, and its separate GGUF MoE operator is specialized for another model geometry. These CPU checks support no speed claim for C. The separately measured D configuration embeds adapted NInfer kernels in Strata; it does not run the complete standalone NInfer engine.
+**C remains unmeasured as a complete model runtime.** A built Windows SM75 executable now runs a Sage-shaped NInfer expert operation against a numerical oracle. It does not load or generate from the full Sage model. D remains the separately measured Strata runtime with adapted NInfer kernels.
 
-A CPU-only experimental source adapter now maps the existing IQ4_XS gate, up and down expert rows into NInfer `LogicalSource` objects without requantizing those blocks. The source reader passed 960 exact byte comparisons against independent file-offset reads: 40 layers, three projections, four boundary/interior expert IDs and two boundary rows. The artifact writer then serialized all three matrices of one selected real expert, and their re-read object bytes matched the source blocks. These checks do not test the full artifact, model execution or every source byte.
+The work uses [NInfer-all at 71d3f819](https://github.com/iamwavecut/ninfer-all/tree/71d3f8190772ef7089f8eda4e22371114fd5bbf9). The pinned Qwen MoE binding does not accept its GGUF expert profile; the existing GGUF expert operator has Flash-Next dimensions (2560 hidden, 640 expert width, top 10). Sage needs 2048 hidden, 512 expert width, 256 experts and top 8.
 
-Nine Python 3.11 CPU tests passed: four source-binding and artifact tests, and five oracle tests. The latter include an independent FP64 IQ4_XS decoder checked against the gguf decoder on adversarial synthetic blocks and sampled real rows, plus small scalar checks of expert and shared-expert mathematics. Their reference describes represented weights and FP64 math; it does not yet model the candidate GPU operator's activation quantization, BF16 intermediates, routing or accumulation. The artifact round-trip uses hard links; the managed sandbox denied that operation, and the same CPU test passed outside it. No GPU model run was performed for C.
+## Source and artifact mapping
 
-The model's actual GGUF contains IQ4_XS expert matrices and mixed other representations. Preserving the expert blocks does not imply byte-identical conversion of every parameter: direct F32 tensors and the Q4_K GDN controls need explicit mapping into NInfer's supported operands. Any BF16 rounding or changed computation must be disclosed and tested against the represented source. The converter must also handle the model's GDN head ordering and attention mappings; the existing dense GGUF recipe has different fixed dimensions. MTP must remain explicit and separately implemented; the initial no-draft baseline is not an MTP qualification.
+The experimental LogicalSource adapter preserves encoded IQ4_XS expert rows. There were 960 exact byte comparisons across all 40 text layers and all 120 expert banks, sampling expert IDs 0, 1, 127 and 255 and boundary rows. One real expert's gate/up/down matrices also survived artifact serialization and reread byte for byte. This is not a complete converted inference artifact.
 
-The remaining runtime work includes a Sage-shaped GGUF expert operator with top-8 routing, correct workspace and graph lifetimes, the Qwen model binding, a complete conversion recipe and resource/config handling, a native Windows build, independent numerical qualification and a matched end-to-end benchmark. A temporary Sage-geometry CUDA compile probe exists locally but is uncompiled and unqualified; it is excluded from the published CPU patch. See [reproduction instructions](../research/ninfer-all/README.md) for the tested partial work and its limitations.
+The Python 3.11 CPU suite expanded from nine to 17 passing tests. It checks grouped gate/up bindings, GDN head permutations and input-column selection, full-attention encoded row mappings, and independent FP64 IQ4_XS/Q4_K/Q6_K decoders against the gguf CPU decoder. The hard-link artifact test required execution outside the managed sandbox. These checks do not qualify model output.
+
+All 21,053,440 F32 router/shared-gate values in the 40 text layers were exactly representable in BF16. Conversely, decoding Q4_K GDN controls and then casting them to BF16 changed 3,818,585 of 3,932,160 values, maximum absolute change 0.00048732757568359375. A simple control-weight cast therefore changes the model's represented weights. A block-preserving control operation or a separately qualified precision change is still needed.
+
+## Native operator milestone
+
+The experimental operator shares the staged GGUF implementation with the donor while supplying explicit Sage dimensions. It does not call the Flash-Next fused decode path with incompatible dimensions. Both Sage and the original Flash-Next translation units compile for SM75. The extracted helper body was checked against the pinned original; a full Flash-Next runtime regression has not run.
+
+The isolated CMake target builds real core, GGUF bridge and operator dependencies without FFmpeg or the serving engine. Initial linking exposed missing `device_launch.cpp` and `sm70_gemm.cu`; adding those upstream implementations resolved the missing symbols. No mathematical stubs were used. The Release build uses CUDA 13.0.88 and MSVC 19.44. It emitted CUDA header code-page warnings and a static/dynamic C-runtime linkage warning; this is an experimental test executable, not a packaged Windows runtime release.
+
+On the RTX 2080 Ti 22 GB, the following synthetic encoded-weight checks passed:
+
+| Tokens | Route | Relative L2 error | Maximum error / maximum reference magnitude |
+| ---: | --- | ---: | ---: |
+| 1 | Vector | 0.00898210 | 0.00593249 |
+| 8 | Vector | 0.00970755 | 0.00824226 |
+| 9 | Matrix | 0.00970093 | 0.01159010 |
+| 9 | Vector | 0.01041270 | 0.01181550 |
+
+The independent CPU oracle decodes IQ4_XS routed and Q4_K/Q6_K shared weights, computes products and SiLU in FP64, and sums the given routing weights. The GPU uses Q8_1 activations and BF16 intermediate storage; equality to this reference is not expected. Criteria were relative L2 below 0.04 and normalized maximum error below 0.16, inherited from the donor test, not adjusted after the result. Repeated eager execution was bit-identical. The fixture has 256 table entries backed by two distinct routed matrices, not 256 distinct real expert matrices. The nonresident flag selects the vector path over device-backed fixture weights; it does not test host/disk streaming. No operator speed claim is made.
+
+## Remaining model integration
+
+The graph extension also passed two replays for each of the four cases above,
+with byte-identical eager/replay results and the workspace scope returning to
+zero. The first rebuild missed changes in the included test fixture; adding an
+explicit CMake object dependency caused it to rebuild, and only the executable
+whose output lists all four graph checks is counted as graph evidence. This is
+operator graph coverage, not a full-model graph qualification.
+
+The next work is the complete converter recipe/frontend, GDN controls and attention mappings, Qwen routing and GGUF operand binding, model-owned weight tables and graph/workspace lifetimes, then full-model logits/quality and a matched A/B/C/D benchmark. MTP, host/disk experts and multi-GPU behavior are not supplied by this operator experiment. C's expected 40% uplift remains a hypothesis.
+
+The [portable patches and reproduction commands](../research/ninfer-all/README.md) preserve the CPU adapter and operator work separately. No model weights or private launch paths are included in those patches.

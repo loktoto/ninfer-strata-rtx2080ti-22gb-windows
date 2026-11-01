@@ -2,7 +2,7 @@ diff --git a/tools/convert/sage_gguf_experts.py b/tools/convert/sage_gguf_expert
 new file mode 100644
 --- /dev/null
 +++ b/tools/convert/sage_gguf_experts.py
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,163 @@
 +"""Experimental Qwen3.5 MoE GGUF expert source bindings.
 +
 +This module preserves IQ4_XS block rows. It is deliberately not registered as a
@@ -33,11 +33,144 @@ new file mode 100644
 +        sources[role] = block_source(gguf, name, (row_count, columns),
 +                                     rows(expert * row_count))
 +    return sources
++
++# Sage GDN has 16 key heads and 32 value heads of width 128. The GGUF stores
++# value heads tiled, while the Qwen adapter uses grouped heads. This permutation
++# is architecture-specific and has not yet been qualified end to end.
++GDN_KEY_HEADS = 16
++GDN_VALUE_HEADS = 32
++GDN_HEAD_DIM = 128
++
++
++def sage_gdn_grouped_to_tiled():
++    import numpy as np
++    h = np.arange(GDN_VALUE_HEADS, dtype=np.int64)
++    per_key = GDN_VALUE_HEADS // GDN_KEY_HEADS
++    return (h % per_key) * GDN_KEY_HEADS + h // per_key
++
++
++def sage_gdn_untiled_rows(base=0):
++    import numpy as np
++    permutation = sage_gdn_grouped_to_tiled()
++    def select(begin, end):
++        if not 0 <= begin <= end <= GDN_VALUE_HEADS * GDN_HEAD_DIM:
++            raise ValueError('GDN value-head row range is invalid')
++        logical = np.arange(begin, end, dtype=np.int64)
++        return base + permutation[logical // GDN_HEAD_DIM] * GDN_HEAD_DIM + logical % GDN_HEAD_DIM
++    return select
++
++
++def sage_gdn_tiled_input_columns():
++    """Grouped activation column used by each stored tiled input column."""
++    import numpy as np
++    tiled = np.arange(GDN_VALUE_HEADS * GDN_HEAD_DIM, dtype=np.int64)
++    head, lane = tiled // GDN_HEAD_DIM, tiled % GDN_HEAD_DIM
++    per_key = GDN_VALUE_HEADS // GDN_KEY_HEADS
++    grouped_head = (head % GDN_KEY_HEADS) * per_key + head // GDN_KEY_HEADS
++    return (grouped_head * GDN_HEAD_DIM + lane).astype(np.int32)
++
++
++def gdn_projection_sources(gguf, layer: int):
++    """Candidate encoded Sage GDN projection bindings; not a full recipe."""
++    if not 0 <= layer < LAYERS or layer % 4 == 3:
++        raise ValueError('layer is not a Sage GDN layer')
++    p = f'blk.{layer}.'
++    shapes = {'attn_qkv.weight': (8192, HIDDEN),
++              'attn_gate.weight': (4096, HIDDEN),
++              'ssm_out.weight': (HIDDEN, 4096)}
++    for name, expected in shapes.items():
++        if gguf.info(p + name).shape != expected:
++            raise ValueError(f'{p+name}: unexpected GDN geometry')
++    qkv = p + 'attn_qkv.weight'
++    return {
++        'query': block_source(gguf, qkv, (2048,HIDDEN), rows()),
++        'key': block_source(gguf, qkv, (2048,HIDDEN), rows(2048)),
++        'value': block_source(gguf, qkv, (4096,HIDDEN), sage_gdn_untiled_rows(4096)),
++        'z': block_source(gguf, p+'attn_gate.weight', (4096,HIDDEN), sage_gdn_untiled_rows()),
++        # Keep stored tiled columns. The matching input_columns auxiliary must
++        # be attached by the eventual recipe; this function does not attach it.
++        'output': block_source(gguf, p+'ssm_out.weight', (HIDDEN,4096), rows()),
++    }
++
++
++def router_sources(gguf, layer: int):
++    """Read router and shared gate as BF16 only when every F32 value is exact."""
++    import numpy as np
++    import torch
++    from .sources.logical import array_source
++    if not 0 <= layer < LAYERS:
++        raise ValueError('layer outside Sage text tower')
++    out = {}
++    for role, name, expected in (
++        ('router', 'ffn_gate_inp.weight', (EXPERTS,HIDDEN)),
++        ('shared_score', 'ffn_gate_inp_shexp.weight', (HIDDEN,)),
++    ):
++        tensor = f'blk.{layer}.{name}'
++        info = gguf.info(tensor)
++        if info.type_id != 0 or info.shape != expected:
++            raise ValueError(f'{tensor}: expected Sage F32 router geometry')
++        values = np.asarray(gguf.read_direct(tensor), dtype=np.float32).reshape(-1,HIDDEN)
++        if not np.isfinite(values).all():
++            raise ValueError(f'{tensor}: nonfinite router weight')
++        original = torch.from_numpy(np.array(values, dtype=np.float32, copy=True, order='C'))
++        bf16 = original.to(torch.bfloat16)
++        if not torch.equal(bf16.float(), original):
++            raise ValueError(f'{tensor}: BF16 would alter router weights')
++        out[role] = array_source(bf16, tensor)
++    return out
++
++
++def gdn_control_sources(gguf, layer: int):
++    """Keep Sage's Q4_K A/B matrices in their encoded GGUF form.
++
++    The current Qwen runtime does not yet accept these sources as control
++    operands. The row order here maps the GGUF value heads to grouped heads.
++    """
++    if not 0 <= layer < LAYERS or layer % 4 == 3:
++        raise ValueError('layer is not a Sage GDN layer')
++    permutation = sage_gdn_grouped_to_tiled()
++    def select(begin, end):
++        if not 0 <= begin <= end <= GDN_VALUE_HEADS:
++            raise ValueError('invalid GDN head range')
++        return permutation[begin:end]
++    out = {}
++    for role, tensor in (('a_projection','ssm_alpha.weight'),('b_projection','ssm_beta.weight')):
++        name = f'blk.{layer}.{tensor}'
++        info = gguf.info(name)
++        if info.type_id != 12 or info.shape != (GDN_VALUE_HEADS,HIDDEN):
++            raise ValueError(f'{name}: expected Sage Q4_K GDN control geometry')
++        out[role] = block_source(gguf,name,(GDN_VALUE_HEADS,HIDDEN),select)
++    return out
++
++
++def attention_projection_sources(gguf, layer: int):
++    """Candidate encoded full-attention Q/K/V/output and output-gate sources."""
++    import numpy as np
++    if not 0 <= layer < LAYERS or layer % 4 != 3:
++        raise ValueError('layer is not a Sage full-attention layer')
++    p=f'blk.{layer}.'
++    shapes={'attn_q.weight':(8192,HIDDEN),'attn_k.weight':(512,HIDDEN),
++            'attn_v.weight':(512,HIDDEN),'attn_output.weight':(HIDDEN,4096)}
++    for name, shape in shapes.items():
++        if gguf.info(p+name).shape != shape:
++            raise ValueError(f'{p+name}: unexpected attention geometry')
++    def qrows(gate):
++        def select(begin,end):
++            if not 0 <= begin <= end <= 4096:
++                raise ValueError('attention row range invalid')
++            logical=np.arange(begin,end,dtype=np.int64)
++            return (logical//256)*512 + (256 if gate else 0) + logical%256
++        return select
++    return {'query':block_source(gguf,p+'attn_q.weight',(4096,HIDDEN),qrows(False)),
++            'gate':block_source(gguf,p+'attn_q.weight',(4096,HIDDEN),qrows(True)),
++            'key':block_source(gguf,p+'attn_k.weight',(512,HIDDEN),rows()),
++            'value':block_source(gguf,p+'attn_v.weight',(512,HIDDEN),rows()),
++            'output':block_source(gguf,p+'attn_output.weight',(HIDDEN,4096),rows())}
 diff --git a/tools/convert/sage_iq4xs_oracle.py b/tools/convert/sage_iq4xs_oracle.py
 new file mode 100644
 --- /dev/null
 +++ b/tools/convert/sage_iq4xs_oracle.py
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,86 @@
 +"""Independent FP64 IQ4_XS block decoder for Sage expert numerical qualification.
 +
 +Inputs are rows of ggml IQ4_XS blocks, 136 bytes per 256 weights. This is an
@@ -96,6 +229,34 @@ new file mode 100644
 +    for expert, weight in zip(ids, weights):
 +        out += float(weight) * expert_product(x, *experts[expert])
 +    return out + float(shared_weight) * expert_product(x, *shared)
++
++
++def decode_shared_k(raw, kind):
++    """Decode Q4_K or Q6_K shared-expert rows to FP64 for oracle fixtures."""
++    raw = np.asarray(raw, dtype=np.uint8)
++    block_bytes = {'q4_k':144, 'q6_k':210}.get(kind)
++    if not block_bytes or raw.ndim != 2 or not raw.shape[0] or not raw.shape[1] or raw.shape[1] % block_bytes:
++        raise ValueError('invalid shared K-format rows')
++    blocks = np.ascontiguousarray(raw).reshape(raw.shape[0], -1, block_bytes)
++    out = np.empty((raw.shape[0], blocks.shape[1], 256), dtype=np.float64)
++    for row in range(blocks.shape[0]):
++        for block in range(blocks.shape[1]):
++            b = blocks[row,block]
++            half = lambda p: float(b[p:p+2].copy().view('<f2')[0])
++            for element in range(256):
++                if kind == 'q4_k':
++                    sub, lane = divmod(element,32); s=b[4:16]
++                    scale = int(s[sub]&63) if sub<4 else int(s[sub+4]&15)|((int(s[sub-4])>>6)<<4)
++                    minimum = int(s[sub+4]&63) if sub<4 else (int(s[sub+4])>>4)|((int(s[sub])>>6)<<4)
++                    packed = int(b[16+(sub//2)*32+lane]); code=packed>>4 if sub%2 else packed&15
++                    out[row,block,element] = half(0)*scale*code-half(2)*minimum
++                else:
++                    group, within = divmod(element,128); sub, lane = divmod(within,32)
++                    low=int(b[group*64+(sub%2)*32+lane]); high=int(b[128+group*32+lane])
++                    code=((low&15 if sub<2 else low>>4)|(((high>>(2*sub))&3)<<4))-32
++                    value=int(b[192+group*8+sub*2+lane//16]); scale=value if value<128 else value-256
++                    out[row,block,element] = half(208)*scale*code
++    return out.reshape(raw.shape[0],-1)
 diff --git a/tools/convert/verify_sage_expert_rows.py b/tools/convert/verify_sage_expert_rows.py
 new file mode 100644
 --- /dev/null
@@ -156,7 +317,7 @@ diff --git a/tests/convert/test_sage_gguf_experts.py b/tests/convert/test_sage_g
 new file mode 100644
 --- /dev/null
 +++ b/tests/convert/test_sage_gguf_experts.py
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,185 @@
 +import unittest
 +import numpy as np
 +from types import SimpleNamespace
@@ -228,6 +389,8 @@ new file mode 100644
 +            recipe = Recipe(model)
 +            for role, source in sources.items():
 +                recipe.assign(role, format='gguf_iq4_xs', method=import_encoded, source=source)
++            # One expert's gate then up rows share a parent; down remains separate.
++            recipe.group(['gate', 'up'])
 +            prepared = recipe.prepare(device='cpu', rows_per_chunk=127)
 +            path = Path(tmp) / 'one-expert.ninfer'
 +            with ArtifactWriter(path, [job.spec for job in prepared.weights],
@@ -237,15 +400,114 @@ new file mode 100644
 +                    job.prepared.produce(TensorOutput(writer, job.spec.id))
 +            with Artifact(path) as artifact:
 +                for job in prepared.weights:
-+                    role = job.parameters[0]
-+                    rows = 2048 if role == 'down' else 512
-+                    expected = sources[role].read_encoded(0, rows).codes.numpy().tobytes()
++                    expected = b''.join(
++                        sources[role].read_encoded(0, 2048 if role == 'down' else 512)
++                        .codes.numpy().tobytes() for role in job.parameters
++                    )
 +                    self.assertEqual(artifact.read_object(job.spec.id), expected)
++                from tools.artifact.schema import binding_parts
++                gate = binding_parts(artifact.directory.bindings['gate'], artifact.by_id)[0]
++                up = binding_parts(artifact.directory.bindings['up'], artifact.by_id)[0]
++                self.assertEqual(gate[0], up[0])
++                self.assertEqual(gate[1:], (0, 512 * 2048))
++                self.assertEqual(up[1:], (512 * 2048, 1024 * 2048))
++
++class SageGdnPermutationTest(unittest.TestCase):
++    def test_head_mapping_and_input_gather_are_inverses(self):
++        from tools.convert.sage_gguf_experts import sage_gdn_grouped_to_tiled, sage_gdn_untiled_rows, sage_gdn_tiled_input_columns
++        heads = sage_gdn_grouped_to_tiled()
++        np.testing.assert_array_equal(heads, np.array([j for i in range(16) for j in (i,i+16)]))
++        rows = sage_gdn_untiled_rows()(0,4096)
++        gather = sage_gdn_tiled_input_columns()
++        np.testing.assert_array_equal(gather[rows], np.arange(4096))
++        self.assertEqual(sage_gdn_untiled_rows(4096)(0,1)[0], 4096)
++        with self.assertRaises(ValueError): sage_gdn_untiled_rows()(4096,4097)
++
++    def test_optional_real_encoded_rows(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_gguf_experts import gdn_projection_sources, sage_gdn_untiled_rows
++        model=os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf, open(model,'rb') as raw:
++            for layer in (0, 20, 38):
++                sources=gdn_projection_sources(gguf,layer)
++                for role in ('query','key','value','z','output'):
++                    name={'query':'attn_qkv.weight','key':'attn_qkv.weight',
++                          'value':'attn_qkv.weight','z':'attn_gate.weight','output':'ssm_out.weight'}[role]
++                    info=gguf.info(f'blk.{layer}.{name}')
++                    for row in (0, 128, sources[role].shape[0]-1):
++                        stored=(row if role in ('query','output') else row+2048 if role=='key'
++                                else int(sage_gdn_untiled_rows(4096 if role=='value' else 0)(row,row+1)[0]))
++                        row_bytes=gguf._row_bytes(info)
++                        raw.seek(gguf.data_offset+info.offset+stored*row_bytes)
++                        self.assertEqual(sources[role].read_encoded(row,row+1).codes.numpy().tobytes(),raw.read(row_bytes))
++
++class SageRouterTest(unittest.TestCase):
++    def test_roundtrip_exact_or_reject(self):
++        from tools.convert.sage_gguf_experts import router_sources
++        class Router:
++            def info(self, name):
++                return SimpleNamespace(type_id=0, shape=(2048,) if 'shexp' in name else (256,2048))
++            def read_direct(self,name):
++                return np.zeros(self.info(name).shape,dtype=np.float32)
++        self.assertEqual(router_sources(Router(),0)['router'].shape,(256,2048))
++        class NotExact(Router):
++            def read_direct(self,name):
++                result=super().read_direct(name); result.flat[0]=np.float32(1.001);return result
++        with self.assertRaisesRegex(ValueError,'alter'):router_sources(NotExact(),0)
++    def test_optional_all_real_routers(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_gguf_experts import router_sources
++        model=os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf:
++            for layer in range(40):
++                result=router_sources(gguf,layer)
++                self.assertEqual(result['router'].shape,(256,2048))
++                self.assertEqual(result['shared_score'].shape,(1,2048))
++
++class SageGdnControlsTest(unittest.TestCase):
++    def test_optional_real_encoded_controls(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_gguf_experts import gdn_control_sources, sage_gdn_grouped_to_tiled
++        model=os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model:self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf, open(model,'rb') as raw:
++            for layer in (0,20,38):
++                sources=gdn_control_sources(gguf,layer)
++                for role,tensor in [('a_projection','ssm_alpha.weight'),('b_projection','ssm_beta.weight')]:
++                    info=gguf.info(f'blk.{layer}.{tensor}'); row_bytes=gguf._row_bytes(info)
++                    for row in (0,1,15,16,31):
++                        stored=int(sage_gdn_grouped_to_tiled()[row]);raw.seek(gguf.data_offset+info.offset+stored*row_bytes)
++                        encoded=sources[role].read_encoded(row,row+1)
++                        self.assertEqual(encoded.format,'gguf_q4_k')
++                        self.assertEqual(encoded.codes.numpy().tobytes(),raw.read(row_bytes))
++
++class SageAttentionTest(unittest.TestCase):
++    def test_optional_real_attention_rows(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_gguf_experts import attention_projection_sources
++        model=os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model:self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf, open(model,'rb') as raw:
++            for layer in (3,19,39):
++                sources=attention_projection_sources(gguf,layer)
++                for role in ('query','gate','key','value','output'):
++                    name={'query':'attn_q.weight','gate':'attn_q.weight','key':'attn_k.weight','value':'attn_v.weight','output':'attn_output.weight'}[role]
++                    info=gguf.info(f'blk.{layer}.{name}');size=gguf._row_bytes(info)
++                    for row in (0,255,sources[role].shape[0]-1):
++                        actual=(row//256)*512+(256 if role=='gate' else 0)+row%256 if role in ('query','gate') else row
++                        raw.seek(gguf.data_offset+info.offset+actual*size)
++                        self.assertEqual(sources[role].read_encoded(row,row+1).codes.numpy().tobytes(),raw.read(size))
 diff --git a/tests/convert/test_sage_iq4xs_oracle.py b/tests/convert/test_sage_iq4xs_oracle.py
 new file mode 100644
 --- /dev/null
 +++ b/tests/convert/test_sage_iq4xs_oracle.py
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,76 @@
 +import unittest
 +import numpy as np
 +from gguf import GGMLQuantizationType
@@ -299,3 +561,26 @@ new file mode 100644
 +        from tools.convert.sage_iq4xs_oracle import expert_product, routed_sum
 +        with self.assertRaises(ValueError): expert_product([1], [[1,2]], [[1,2]], [[1]])
 +        with self.assertRaises(ValueError): routed_sum([1], {}, [], [], None, 1)
++
++class SageSharedReferenceTest(unittest.TestCase):
++    def test_shared_k_decoders_against_gguf(self):
++        from tools.convert.sage_iq4xs_oracle import decode_shared_k
++        rng=np.random.default_rng(33)
++        for name,kind,size,offsets in [('q4_k',GGMLQuantizationType.Q4_K,144,(0,2)),('q6_k',GGMLQuantizationType.Q6_K,210,(208,))]:
++            blocks=rng.integers(0,256,size=(4,size),dtype=np.uint8)
++            for offset in offsets: blocks[:,offset:offset+2]=[0,56]
++            np.testing.assert_array_equal(decode_shared_k(blocks,name),dequantize(blocks,kind).astype(np.float64))
++
++    def test_optional_real_shared_blocks(self):
++        import os
++        from tools.convert.sources.gguf import GGUFFile
++        from tools.convert.sage_iq4xs_oracle import decode_shared_k
++        model=os.environ.get('NINFER_TEST_SAGE_GGUF')
++        if not model: self.skipTest('set NINFER_TEST_SAGE_GGUF for real weights')
++        with GGUFFile(model) as gguf:
++            for layer in (0,19,39):
++                for name,kind,q in [('ffn_gate_shexp.weight','q4_k',GGMLQuantizationType.Q4_K),('ffn_up_shexp.weight','q4_k',GGMLQuantizationType.Q4_K),('ffn_down_shexp.weight','q6_k',GGMLQuantizationType.Q6_K)]:
++                    tensor=f'blk.{layer}.{name}'
++                    for row in (0,gguf.info(tensor).shape[0]-1):
++                        blocks=gguf.read_blocks(tensor,row,row+1)
++                        np.testing.assert_array_equal(decode_shared_k(blocks,kind),dequantize(blocks,q).astype(np.float64))
