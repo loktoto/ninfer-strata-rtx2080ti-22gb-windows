@@ -53,6 +53,24 @@ Stop the running server before starting another on port 8080. Keep the same mode
 
 `-Native` is native **Strata**, not standalone NInfer or the llama.cpp baseline. Bounded runs on an RTX 2080 Ti 22 GB measured a 6.6–6.8% no-draft expert-path decode improvement in two tasks, and a separate combined MTP configuration measured +66.0% and +58.8% versus llama.cpp without drafting. These are small, workload-specific experiments, not expected speeds on every prompt or a standalone NInfer speed claim. Prefill was slower in that combined comparison. See [the measured settings and full limitations](IQ4XS_MTP_RESULTS_2026-10-30.md).
 
+## Optional native fusion experiment
+
+On the prepared PC:
+
+```powershell
+.\tools\start_iq4xs.ps1 -Model 'D:\models\Sage-IQ4_XS.gguf' -FusedNormQ8 -DryRun
+.\tools\start_iq4xs.ps1 -Model 'D:\models\Sage-IQ4_XS.gguf' -FusedNormQ8
+```
+
+This switch selects `build-fused\strata\strata-poly.exe` when `-Engine` is omitted.
+On a fresh checkout, build that directory explicitly with
+`tools\build_windows.ps1 -BuildDirectory build-fused -Jobs 2` and validate it.
+A custom `-Engine` must include patch 0010; an older engine may ignore the setting.
+The [fusion study](IQ4XS_FUSION_RESULTS_2026-11-01.md) measured +4.37% arithmetic
+and +0.83% Python decode, but slower prefill and worse wall time on Python and
+retrieval. It therefore stays optional; the normal command still selects the
+earlier measured combined profile.
+
 ## Restart a saved configuration
 
 The launcher prints the newly saved `strata-sage.json` path. To reuse its extracted tokenizer and settings, stop the first instance and substitute that path below. The config records absolute model, executable and tokenizer paths, so keep those files in place or make a fresh run after moving them.

@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "rows": 248320,
+  "columns": 2048,
+  "additional_device_bytes": 417177600,
+  "runs": [
+    {
+      "run": "q6-head-logits-20261101",
+      "selected_grid": 640,
+      "paired": [
+        {
+          "columns": 1,
+          "native_median_us": 1073.2,
+          "native_min_us": 877.0,
+          "native_max_us": 1428.3,
+          "packed_median_us": 1085.5,
+          "packed_min_us": 974.8,
+          "packed_max_us": 1314.3,
+          "paired_samples": 11
+        },
+        {
+          "columns": 2,
+          "native_median_us": 1162.4,
+          "native_min_us": 935.9,
+          "native_max_us": 1335.0,
+          "packed_median_us": 1430.0,
+          "packed_min_us": 1235.2,
+          "packed_max_us": 1831.9,
+          "paired_samples": 11
+        },
+        {
+          "columns": 4,
+          "native_median_us": 1711.7,
+          "native_min_us": 1500.4,
+          "native_max_us": 2053.8,
+          "packed_median_us": 1804.0,
+          "packed_min_us": 1661.8,
+          "packed_max_us": 2180.3,
+          "paired_samples": 11
+        }
+      ],
+      "exploratory_grid_sweep": [],
+      "selftest_byte_equal": true,
+      "model_check": {
+        "binary_sha256": "1a8a823e933f5c5491dab9da84b12ea0f6d9ba3f647c969cdefdf17d73421de0",
+        "comparison": {
+          "steps": 16,
+          "vocab": 248320,
+          "values": 3973120,
+          "failed": 0,
+          "max_abs": 0.0,
+          "rms": 0.0,
+          "top1_agree": 16,
+          "mean_kl_ref_to_candidate": 0.0
+        },
+        "passed": true,
+        "packed_head_selftest": true
+      }
+    },
+    {
+      "run": "q6-head-grid-20261101",
+      "selected_grid": 640,
+      "paired": [
+        {
+          "columns": 1,
+          "native_median_us": 879.9,
+          "native_min_us": 759.7,
+          "native_max_us": 1083.2,
+          "packed_median_us": 1095.3,
+          "packed_min_us": 858.7,
+          "packed_max_us": 1422.5,
+          "paired_samples": 11
+        },
+        {
+          "columns": 2,
+          "native_median_us": 1033.0,
+          "native_min_us": 894.8,
+          "native_max_us": 1203.8,
+          "packed_median_us": 1423.8,
+          "packed_min_us": 1309.8,
+          "packed_max_us": 1501.2,
+          "paired_samples": 11
+        },
+        {
+          "columns": 4,
+          "native_median_us": 1597.1,
+          "native_min_us": 1506.0,
+          "native_max_us": 1649.6,
+          "packed_median_us": 1827.5,
+          "packed_min_us": 1652.0,
+          "packed_max_us": 2170.9,
+          "paired_samples": 11
+        }
+      ],
+      "exploratory_grid_sweep": [
+        {
+          "grid": 160,
+          "columns": 1,
+          "median_us": 1480.6,
+          "min_us": 1407.8,
+          "max_us": 1654.6,
+          "samples": 7
+        },
+        {
+          "grid": 160,
+          "columns": 2,
+          "median_us": 2315.1,
+          "min_us": 2165.6,
+          "max_us": 2474.0,
+          "samples": 7
+        },
+        {
+          "grid": 160,
+          "columns": 4,
+          "median_us": 2874.6,
+          "min_us": 2741.5,
+          "max_us": 3141.8,
+          "samples": 7
+        },
+        {
+          "grid": 320,
+          "columns": 1,
+          "median_us": 945.2,
+          "min_us": 871.7,
+          "max_us": 1079.0,
+          "samples": 7
+        },
+        {
+          "grid": 320,
+          "columns": 2,
+          "median_us": 1401.2,
+          "min_us": 1361.6,
+          "max_us": 1578.6,
+          "samples": 7
+        },
+        {
+          "grid": 320,
+          "columns": 4,
+          "median_us": 1858.2,
+          "min_us": 1813.3,
+          "max_us": 2063.0,
+          "samples": 7
+        },
+        {
+          "grid": 640,
+          "columns": 1,
+          "median_us": 987.1,
+          "min_us": 845.6,
+          "max_us": 1208.8,
+          "samples": 7
+        },
+        {
+          "grid": 640,
+          "columns": 2,
+          "median_us": 1372.8,
+          "min_us": 1316.6,
+          "max_us": 1471.3,
+          "samples": 7
+        },
+        {
+          "grid": 640,
+          "columns": 4,
+          "median_us": 1806.7,
+          "min_us": 1669.2,
+          "max_us": 1937.4,
+          "samples": 7
+        },
+        {
+          "grid": 1280,
+          "columns": 1,
+          "median_us": 910.1,
+          "min_us": 838.9,
+          "max_us": 1141.7,
+          "samples": 7
+        },
+        {
+          "grid": 1280,
+          "columns": 2,
+          "median_us": 1162.0,
+          "min_us": 1021.1,
+          "max_us": 1222.4,
+          "samples": 7
+        },
+        {
+          "grid": 1280,
+          "columns": 4,
+          "median_us": 1589.8,
+          "min_us": 1553.9,
+          "max_us": 1980.4,
+          "samples": 7
+        },
+        {
+          "grid": 2560,
+          "columns": 1,
+          "median_us": 873.9,
+          "min_us": 777.5,
+          "max_us": 1127.5,
+          "samples": 7
+        },
+        {
+          "grid": 2560,
+          "columns": 2,
+          "median_us": 1108.4,
+          "min_us": 934.8,
+          "max_us": 1338.4,
+          "samples": 7
+        },
+        {
+          "grid": 2560,
+          "columns": 4,
+          "median_us": 1537.2,
+          "min_us": 1468.1,
+          "max_us": 2031.2,
+          "samples": 7
+        },
+        {
+          "grid": 5120,
+          "columns": 1,
+          "median_us": 847.6,
+          "min_us": 753.7,
+          "max_us": 974.5,
+          "samples": 7
+        },
+        {
+          "grid": 5120,
+          "columns": 2,
+          "median_us": 1084.8,
+          "min_us": 917.4,
+          "max_us": 1252.1,
+          "samples": 7
+        },
+        {
+          "grid": 5120,
+          "columns": 4,
+          "median_us": 1511.4,
+          "min_us": 1442.6,
+          "max_us": 1549.9,
+          "samples": 7
+        },
+        {
+          "grid": 20480,
+          "columns": 1,
+          "median_us": 832.3,
+          "min_us": 744.2,
+          "max_us": 1149.3,
+          "samples": 7
+        },
+        {
+          "grid": 20480,
+          "columns": 2,
+          "median_us": 1032.4,
+          "min_us": 868.8,
+          "max_us": 1169.2,
+          "samples": 7
+        },
+        {
+          "grid": 20480,
+          "columns": 4,
+          "median_us": 1511.9,
+          "min_us": 1423.3,
+          "max_us": 1963.7,
+          "samples": 7
+        }
+      ],
+      "selftest_byte_equal": true
+    },
+    {
+      "run": "q6-head-tuned-logits-20261101",
+      "selected_grid": 20480,
+      "paired": [
+        {
+          "columns": 1,
+          "native_median_us": 876.0,
+          "native_min_us": 761.9,
+          "native_max_us": 1075.6,
+          "packed_median_us": 1045.7,
+          "packed_min_us": 758.6,
+          "packed_max_us": 1108.6,
+          "paired_samples": 11
+        },
+        {
+          "columns": 2,
+          "native_median_us": 1074.3,
+          "native_min_us": 894.9,
+          "native_max_us": 1160.4,
+          "packed_median_us": 1090.8,
+          "packed_min_us": 903.5,
+          "packed_max_us": 1427.9,
+          "paired_samples": 11
+        },
+        {
+          "columns": 4,
+          "native_median_us": 1571.2,
+          "native_min_us": 1502.0,
+          "native_max_us": 1807.6,
+          "packed_median_us": 1524.5,
+          "packed_min_us": 1425.7,
+          "packed_max_us": 1796.5,
+          "paired_samples": 11
+        }
+      ],
+      "exploratory_grid_sweep": [],
+      "selftest_byte_equal": true,
+      "model_check": {
+        "binary_sha256": "1a8a823e933f5c5491dab9da84b12ea0f6d9ba3f647c969cdefdf17d73421de0",
+        "comparison": {
+          "steps": 16,
+          "vocab": 248320,
+          "values": 3973120,
+          "failed": 0,
+          "max_abs": 0.0,
+          "rms": 0.0,
+          "top1_agree": 16,
+          "mean_kl_ref_to_candidate": 0.0
+        },
+        "passed": true,
+        "packed_head_selftest": true
+      }
+    }
+  ],
+  "note": "Head-only CUDA-event timing; no end-to-end speed claim. The grid sweep is exploratory, not paired with a new native measurement at each grid."
+}

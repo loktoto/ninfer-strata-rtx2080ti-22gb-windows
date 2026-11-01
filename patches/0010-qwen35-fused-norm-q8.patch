@@ -1,0 +1,83 @@
+diff --git a/src/poly/qwen35.cpp b/src/poly/qwen35.cpp
+index 9f5c2d1..14b1a1f 100644
+--- a/src/poly/qwen35.cpp
++++ b/src/poly/qwen35.cpp
+@@ -12,9 +12,11 @@
+ #endif
+ 
+ #include <algorithm>
++#include <atomic>
+ #include <cmath>
+ #include <cstdio>
+ #include <cstdlib>
++#include <cstring>
+ #include <stdexcept>
+ 
+ namespace strata::poly {
+@@ -28,9 +30,23 @@ constexpr size_t kScoreFloats = size_t(16) << 20;  // the attention's scores of
+ // about 16/3 * head_dim rows, well under this, so real prompts take the same products the fp16 path takes.
+ constexpr size_t kQ8WorkRows = 2048;
+ 
++#ifdef STRATA_SAGE_INTEGRATION
++bool sage_fused_norm_q8_enabled() {
++    const char* fused = std::getenv("STRATA_SAGE_FUSED_NORM_Q8");
++    const bool enabled = fused && std::strcmp(fused, "1") == 0;
++    const char* rms = std::getenv("STRATA_SAGE_RMSNORM");
++    if (enabled && rms && std::strcmp(rms, "1") == 0)
++        throw std::runtime_error("STRATA_SAGE_FUSED_NORM_Q8 and STRATA_SAGE_RMSNORM cannot both be enabled");
++    return enabled;
++}
++#endif
++
+ }  // namespace
+ 
+ void Qwen35::begin_pass() {
++#ifdef STRATA_SAGE_INTEGRATION
++    (void) sage_fused_norm_q8_enabled(); // Reject incompatible backends before building layer state.
++#endif
+     blocks_.assign(layers_.size(), Block{});
+     n_gdn_ = n_attn_ = 0;
+ }
+@@ -508,16 +524,36 @@ void Qwen35::attn_rows(Block& B, int n) {
+ // A layer from its input to its router's copy.  A prompt batch's MoE (moe_rows) does its own routing.
+ void Qwen35::layer_head(Layer& L, int il, int n) {
+     Block& B = blocks_[(size_t) il];
+-    rms_norm(r_, fp(L.attn_norm), xn_, n_embd_, n, rms_eps_, st_);
+-    kernels::native_quantize_q8_1(xn_, xq_, n_embd_ * n, 1, st_);
++#ifdef STRATA_SAGE_INTEGRATION
++    const bool fused = sage_fused_norm_q8_enabled();
++    if (fused) {
++        const char* trace = std::getenv("STRATA_SAGE_TRACE");
++        static std::atomic<bool> reported{false};
++        if (trace && std::strcmp(trace, "1") == 0 && !reported.exchange(true))
++            std::fprintf(stderr, "sage-dispatch: fused-norm-q8 enqueue\n");
++        kernels::native_add_rms_norm_q8_1(r_, nullptr, fp(L.attn_norm), xn_, xq_, n_embd_, n, rms_eps_,
++                                          sum_threads(n_embd_), st_);
++    } else
++#endif
++    {
++        rms_norm(r_, fp(L.attn_norm), xn_, n_embd_, n, rms_eps_, st_);
++        kernels::native_quantize_q8_1(xn_, xq_, n_embd_ * n, 1, st_);
++    }
+     dbg("attn_in", il, xn_, n_embd_);
+     if (B.gdn) gdn(B, n);
+     else attn(B, pos_, n);
+     dbg("attn", il, ao_, n_embd_);
+-    axpy(ao_, 1.f, r_, n * n_embd_, true, st_);
+-
+-    rms_norm(r_, fp(L.ffn_norm), xn_, n_embd_, n, rms_eps_, st_);
+-    kernels::native_quantize_q8_1(xn_, xq_, n_embd_ * n, 1, st_);
++#ifdef STRATA_SAGE_INTEGRATION
++    if (fused)
++        kernels::native_add_rms_norm_q8_1(r_, ao_, fp(L.ffn_norm), xn_, xq_, n_embd_, n, rms_eps_,
++                                          sum_threads(n_embd_), st_);
++    else
++#endif
++    {
++        axpy(ao_, 1.f, r_, n * n_embd_, true, st_);
++        rms_norm(r_, fp(L.ffn_norm), xn_, n_embd_, n, rms_eps_, st_);
++        kernels::native_quantize_q8_1(xn_, xq_, n_embd_ * n, 1, st_);
++    }
+     dbg("ffn_in", il, xn_, n_embd_);
+     if (!batched(L, n)) moe_router(L, n);
+ }

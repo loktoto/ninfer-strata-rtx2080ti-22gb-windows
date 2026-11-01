@@ -165,3 +165,12 @@ omitted it; restarting that JSON could inherit the opposite setting from another
 shell. Regenerate old configs to make the saved choice explicit. The reported
 benchmarks used explicit per-run configs and were not affected by this omission.
 
+An additional native Strata fusion experiment uses `--fused-norm-q8` and requires
+a binary containing patch 0010 (the prepared PC has `build-fused`). It can be
+combined with the IQ4_XS expert selection; it cannot be combined with
+`--ninfer-rmsnorm`. Its setting is also saved explicitly for restarts. It remains
+off by default because the [fusion study](IQ4XS_FUSION_RESULTS_2026-11-01.md)
+found both decode gains and prefill/request-latency regressions. The launchers
+also disable inherited packed-head and load-time self-test flags; that separate
+experiment is not part of the normal profile.
+
