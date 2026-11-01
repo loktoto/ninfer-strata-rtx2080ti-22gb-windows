@@ -1,0 +1,35 @@
+diff --git a/src/poly/engine.cpp b/src/poly/engine.cpp
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -485,6 +485,15 @@
+ #endif
+     workers_.reset();
+     mmq_.reset();
++#ifdef STRATA_SAGE_INTEGRATION
++    if (kernels::native_q6_k_packed_enabled() && output_.p && output_.type == 14) {
++        // Captured launches retain packed-plane addresses. All streams have
++        // joined above; destroy those launches before releasing either layout.
++        for (void* g : graphs_) cudaGraphExecDestroy((cudaGraphExec_t) g);
++        graphs_.clear();
++        kernels::native_q6_k_unpack(output_.p);
++    }
++#endif
+     for (void* p : dev_allocs_) cudaFree(p);
+     for (Kv& k : kv_) vmm_free(k);
+     for (Seq& q : seqs_) {
+@@ -1864,6 +1873,15 @@
+             zero_vram(dense_, dense_bytes_ + 256);   // between the tensors: kTail
+         }
+     }
++
++#ifdef STRATA_SAGE_INTEGRATION
++    // Reserve the opt-in packed head before sizing the expert arena and before
++    // graph capture. Keep the original GGUF layout for other matrix routes.
++    if (hi_ == n_layer_ && kernels::native_q6_k_packed_enabled()) {
++        if (output_.type != 14 || !kernels::native_q6_k_pack(output_.p, output_.n_in, output_.n_out, "poly output head"))
++            throw std::runtime_error("STRATA_Q6_PACKED: failed to prepare the Q6_K output head");
++    }
++#endif
+ 
+     // A guess needs the recurrent layers' state as it was before it.  Where that is a copy in VRAM for every
+     // guess of a window, a window is four tokens: the copies come out of what the experts would have.  A model

@@ -33,3 +33,26 @@ built and the standalone NInfer port was incomplete. The later
 [standalone progress](NINFER_STANDALONE_PROGRESS_2026-10-31.md) distinguish
 subsequent observed results from source-only work; neither is assigned an
 unmeasured speed.
+
+## November 1 continuation
+
+The [new snapshot index](../evidence/published-benchmarks/2026-11-01-local-evidence-index.json)
+records a separate local archive after the fusion, standalone operator and
+packed-head experiments. The earlier archive and index remain unchanged.
+Its file count, capture time, byte count and archive digest are in the index.
+
+The continuation preserves all six fusion starts and 54 requests, successful
+and failed CUPTI captures, both packed-head logit comparisons, the exploratory
+grid sweep and unfavorable follow-up, the native operator's initial link error,
+link fix, missed test-dependency rebuild and actual graph checks, plus the
+updated portable patches and setup guide. The snapshot now also includes root
+build logs, the host `src`/`include` trees, CI files and numeric exports; those
+items were outside the older snapshot script's selection. Model weights,
+dependency trees and build binaries are identified by pins/hashes rather than
+duplicated into the archive. The raw archive remains local.
+
+Reproduce this selection with:
+
+```powershell
+python tools/save_evidence_snapshot.py --index-name 2026-11-01-local-evidence-index.json
+```

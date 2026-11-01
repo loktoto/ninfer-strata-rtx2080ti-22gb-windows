@@ -79,6 +79,7 @@ class ServeSageTests(unittest.TestCase):
 
     def test_native_pipeline_and_strict_config_use_explicit_paths(self):
         with mock.patch.dict(os.environ, {"STRATA_SAGE_RMSNORM": "1", "STRATA_SAGE_EXPERT_Q4K": "1",
+                                          "STRATA_Q6_PACKED": "1", "STRATA_Q6P_SELFTEST": "2",
                                           "STRATA_ROUTE_TAIL_SKIP": "1", "STRATA_FREEZE_EXPERTS": "0"}):
             code, _ = self.invoke("--max-context", "16384", "--threads", "8")
         self.assertEqual(code, 0)
@@ -99,7 +100,8 @@ class ServeSageTests(unittest.TestCase):
         self.assertEqual(cfg["env"], {"STRATA_ROUTE_TAIL_SKIP": "0", "STRATA_FREEZE_EXPERTS": "1",
                                       "STRATA_SAGE_TRACE": "0", "STRATA_SAGE_RMSNORM": "0",
                                       "STRATA_SAGE_EXPERT_Q4K": "0", "STRATA_SAGE_EXPERT_Q6K": "0",
-                                      "STRATA_SAGE_EXPERT_IQ4XS": "0"})
+                                      "STRATA_SAGE_EXPERT_IQ4XS": "0", "STRATA_SAGE_FUSED_NORM_Q8": "0",
+                                      "STRATA_Q6_PACKED": "0", "STRATA_Q6P_SELFTEST": "0"})
         for _, kwargs in self.calls[1:]:
             for key, value in cfg["env"].items():
                 self.assertEqual(kwargs["env"][key], value)
@@ -147,6 +149,25 @@ class ServeSageTests(unittest.TestCase):
         self.assertIn("--no-draft", args)
         self.assertEqual(args[args.index("--window") + 1], "1")
         self.assertEqual(args[args.index("--lookup") + 1], "0")
+
+    def test_saved_fusion_setting_controls_initial_and_restarted_child(self):
+        for selected in (False, True):
+            with self.subTest(selected=selected):
+                self.output = self.root / ("fused" if selected else "unfused")
+                self.argv[self.argv.index("--output-dir") + 1] = str(self.output)
+                with mock.patch.dict(os.environ, {"STRATA_SAGE_FUSED_NORM_Q8": "0" if selected else "1"}):
+                    self.invoke(*(["--fused-norm-q8"] if selected else []))
+                expected = "1" if selected else "0"
+                restarted = {"STRATA_SAGE_FUSED_NORM_Q8": "0" if selected else "1"}
+                restarted.update(self.config()["env"])
+                self.assertEqual(restarted["STRATA_SAGE_FUSED_NORM_Q8"], expected)
+                self.assertEqual(self.calls[-1][1]["env"]["STRATA_SAGE_FUSED_NORM_Q8"], expected)
+
+    def test_fusion_rejects_rmsnorm_candidate_before_extracting_model(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.invoke("--fused-norm-q8", "--ninfer-rmsnorm")
+        self.assertEqual(self.calls, [])
+        self.assertFalse(self.output.exists())
 
     def test_experimental_draft_profile_saves_exact_window(self):
         self.invoke("--cuda-graphs", "--draft-window", "4", "--ninfer-expert-iq4xs")

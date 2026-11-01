@@ -1,5 +1,6 @@
 """Keep a local snapshot of evidence and source; publish only its digest index."""
 import hashlib
+import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,16 +10,23 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--index-name', default='2026-10-31-local-evidence-index.json')
+    args = parser.parse_args()
+    if Path(args.index_name).name != args.index_name or '/' in args.index_name or '\\' in args.index_name:
+        parser.error('index-name must be a filename')
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     destination = ROOT / 'evidence-archives'
     destination.mkdir(exist_ok=True)
     archive = destination / f'session-{stamp}.zip'
     sources = []
-    for directory in ('evidence', 'docs', 'tools', 'tests', 'patches', 'integration', 'kernels', 'config', 'research'):
+    for directory in ('evidence', 'docs', 'tools', 'tests', 'patches', 'integration', 'kernels', 'config', 'research',
+                      'src', 'include', '.github'):
         sources.extend(p for p in (ROOT / directory).rglob('*')
                        if p.is_file() and '__pycache__' not in p.parts
-                       and 'published-benchmarks' not in p.parts)
-    sources.extend(ROOT / p for p in ('README.md', 'CMakeLists.txt', 'NOTICE', 'LICENSE'))
+                       and not (p.parent.name == 'published-benchmarks' and p.name.endswith('-local-evidence-index.json')))
+    sources.extend(ROOT / p for p in ('README.md', 'CMakeLists.txt', 'NOTICE', 'LICENSE', '.gitignore', '.gitattributes'))
+    sources.extend(ROOT.glob('*.log'))
     records = []
     with zipfile.ZipFile(archive, 'x', compression=zipfile.ZIP_STORED, allowZip64=True) as output:
         for path in sorted(set(sources)):
@@ -44,8 +52,8 @@ def main():
                 'local_archive': archive.relative_to(ROOT).as_posix(),
                 'archive_sha256': archive_digest, 'archive_bytes': archive.stat().st_size,
                 'file_count': len(records), 'files': records,
-                'scope': 'Raw local evidence and project source/docs at capture time; no model weights, build trees, or dependency checkouts. Raw archive is local only.'}
-    manifest_path = ROOT / 'evidence/published-benchmarks/2026-10-31-local-evidence-index.json'
+                'scope': 'Raw local evidence, numeric exports and project source/docs at capture time; no model weights, build trees, dependency checkouts or evidence indexes. Raw archive is local only.'}
+    manifest_path = ROOT / 'evidence/published-benchmarks' / args.index_name
     manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     print(json.dumps({k: v for k, v in manifest.items() if k != 'files'}, indent=2))
 

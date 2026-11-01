@@ -15,7 +15,8 @@ from launch_strict import launch_spec
 
 ENV_KEYS = ("STRATA_ROUTE_TAIL_SKIP", "STRATA_FREEZE_EXPERTS",
             "STRATA_SAGE_TRACE", "STRATA_SAGE_RMSNORM", "STRATA_SAGE_EXPERT_Q4K",
-            "STRATA_SAGE_EXPERT_Q6K", "STRATA_SAGE_EXPERT_IQ4XS")
+            "STRATA_SAGE_EXPERT_Q6K", "STRATA_SAGE_EXPERT_IQ4XS", "STRATA_SAGE_FUSED_NORM_Q8",
+            "STRATA_Q6_PACKED", "STRATA_Q6P_SELFTEST")
 
 
 def positive_int(value):
@@ -57,6 +58,7 @@ def main(argv=None):
     parser.add_argument("--ninfer-expert-q4k", action="store_true", help="opt into the experimental Q4_K candidate")
     parser.add_argument("--ninfer-expert-iq4xs", action="store_true", help="opt into the experimental IQ4_XS expert candidate")
     parser.add_argument("--ninfer-expert-q6k", action="store_true", help="opt into the Q6_K candidate")
+    parser.add_argument("--fused-norm-q8", action="store_true", help="opt into experimental native Strata residual/norm/Q8 fusion; requires patch 0010")
     parser.add_argument("--dry-run", action="store_true", help="validate paths and print the plan without writing files or starting inference; also works on Linux")
     args = parser.parse_args(argv)
     if not args.dry_run and platform.system() != "Windows":
@@ -71,7 +73,8 @@ def main(argv=None):
         if args.threads is not None:
             extra += ["--threads", str(args.threads)]
         engine_command, env = launch_spec(args.engine, args.model, extra,
-                                         args.ninfer_rmsnorm, ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k, ninfer_expert_iq4xs=args.ninfer_expert_iq4xs)
+                                         args.ninfer_rmsnorm, ninfer_expert_q4k=args.ninfer_expert_q4k, ninfer_expert_q6k=args.ninfer_expert_q6k, ninfer_expert_iq4xs=args.ninfer_expert_iq4xs,
+                                         fused_norm_q8=args.fused_norm_q8)
         if args.cuda_graphs:
             engine_command.remove("--no-graphs")
         if args.draft_window is not None:

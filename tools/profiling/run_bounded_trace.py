@@ -23,7 +23,11 @@ def main():
     parser.add_argument('--cupti-root', type=Path, required=True, help='extracted CUDA CUPTI archive root')
     parser.add_argument('--native', action='store_true', help='use native Strata expert kernels')
     parser.add_argument('--no-draft', action='store_true', help='disable speculative drafting')
+    parser.add_argument('--fused-norm-q8', action='store_true', help='trace the explicit patch-0010 native fusion candidate')
     args = parser.parse_args()
+    # The engine runs from the upstream checkout, not this launcher's cwd.
+    # Relative DLL search paths would silently prevent CUPTI injection there.
+    args.cupti_root = args.cupti_root.resolve(strict=True)
     with socket.socket() as sock:
         if sock.connect_ex(('127.0.0.1', args.port)) == 0:
             raise RuntimeError('Selected local port is already in use')
@@ -39,6 +43,7 @@ def main():
     config['env']['STRATA_SAGE_EXPERT_IQ4XS'] = '0' if args.native else '1'
     for key in ('STRATA_SAGE_RMSNORM', 'STRATA_SAGE_EXPERT_Q4K', 'STRATA_SAGE_EXPERT_Q6K', 'STRATA_SAGE_TRACE', 'STRATA_SAGE_FUSED_NORM_Q8'):
         config['env'][key] = '0'
+    config['env']['STRATA_SAGE_FUSED_NORM_Q8'] = '1' if args.fused_norm_q8 else '0'
     config['env'].pop('GGML_CUDA_DISABLE_GRAPHS', None)
     config['args'] = [arg for arg in config['args'] if arg != '--no-graphs']
     if args.no_draft:
@@ -95,6 +100,10 @@ def main():
         (out / 'request-metrics.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf8')
         subprocess.run(['taskkill', '/PID', str(server.pid), '/T', '/F'], capture_output=True, timeout=20)
         log.close()
+    summary['trace_file_present'] = trace.is_file() and trace.stat().st_size > 0
+    (out / 'request-metrics.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf8')
+    if not summary['trace_file_present']:
+        raise RuntimeError('API request completed, but CUPTI produced no trace; check injection DLL dependencies')
     print(json.dumps(summary, indent=2))
 
 
