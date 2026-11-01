@@ -1,0 +1,132 @@
+{
+  "archive": "actual-long-context-20261101.zip",
+  "bytes": 136960,
+  "sha256": "0f51604d02baf8ecbb7374e458a52ad4d267fcc7339b264d10f23a4e71d2bc4a",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 394,
+      "sha256": "549882c817e63ba095068670049ec7b325552e5771a3a2e31a55442d82069499"
+    },
+    {
+      "path": "docs/ACTUAL_LONG_CONTEXT_2026-11-01.md",
+      "bytes": 7637,
+      "sha256": "9e498c69f3216ff9e8de03d3dd1b0bcb42e6734ae4376a42595a94e649a5d086"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/A-fp16-server.log",
+      "bytes": 44134,
+      "sha256": "51d377185dd835cf3caa4dd1595ca9d63fab4a9c756a0243000624b70a34bc3f"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-fp16-config.json",
+      "bytes": 1399,
+      "sha256": "2d3fa96f62f7491ca6c8de8b37ec26573a81b4506a92abc81c051e5e615de575"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-fp16-server.log",
+      "bytes": 3413,
+      "sha256": "3d8c1af088918d21268830dc158822e4825f3adce3f19583727ee7550062f46e"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-q8-config.json",
+      "bytes": 1399,
+      "sha256": "0bc416ec5470c508f64e15b3013dcbf9bf1cf23e35e0e6245dabfd87d98f07bf"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-q8-server.log",
+      "bytes": 3481,
+      "sha256": "4dfb01dc036e01789a1d1f3061a9b770430e70ad026b450a4fb35d9a5d915b89"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-reserve-config.json",
+      "bytes": 1439,
+      "sha256": "bc81fb195d41d7058ea052bb7ae9a7838fdc703c428c6e2d7d84c4ff5fed47d1"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/D-reserve-server.log",
+      "bytes": 3408,
+      "sha256": "0d67562edee534d672b7b566353b219219c91bdae70c42f4b0cb27df8545cc32"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/prompt.txt",
+      "bytes": 166025,
+      "sha256": "b4a94b78735c3c9b35a143419b58c9055d6adab0b52b08d7fb8229f8e55f6e59"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/results.json",
+      "bytes": 59595,
+      "sha256": "8a57df32c9e29c758cbc2c2903400688e76226330b8834b4eac9f96035be9f63"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/user-run-numeric.json",
+      "bytes": 9447,
+      "sha256": "d7b28b665f68715e5aee8bdfbaf6d021ebc0e67c888601f03e42b7dd66b80bd8"
+    },
+    {
+      "path": "evidence/actual-long-context-20261101/user-run.txt",
+      "bytes": 44147,
+      "sha256": "11850ab6ab1139ca8a98a0594857acc0c1de6ee02eb39ea9f6ce19297ab6436d"
+    },
+    {
+      "path": "evidence/actual-lowram-20261101/D-lowram-config.json",
+      "bytes": 1475,
+      "sha256": "c76fcb3d77e0f107309208593ecd04d926d0010da9b6b94534c3e43e1b8693ef"
+    },
+    {
+      "path": "evidence/actual-lowram-20261101/D-lowram-server.log",
+      "bytes": 3413,
+      "sha256": "da65546898b47130cc729dfcab7965419369f3c871f1d8aeaf651213d436834b"
+    },
+    {
+      "path": "evidence/actual-lowram-20261101/prompt.txt",
+      "bytes": 166025,
+      "sha256": "b4a94b78735c3c9b35a143419b58c9055d6adab0b52b08d7fb8229f8e55f6e59"
+    },
+    {
+      "path": "evidence/actual-lowram-20261101/results.json",
+      "bytes": 12006,
+      "sha256": "ef3c6bcdb50ac2601659269ac842bc00cdf767416ca96ed86c733076a9744c39"
+    },
+    {
+      "path": "evidence/actual-no-draft-20261101/D-no-draft-config.json",
+      "bytes": 1418,
+      "sha256": "3f4f1520b89e6fff4bd62737e20b331d23b68fa623114410d26dd4f380ec5a14"
+    },
+    {
+      "path": "evidence/actual-no-draft-20261101/D-no-draft-server.log",
+      "bytes": 3481,
+      "sha256": "238d642b644112319644cb031c3130ed7238d458a13bf4133be6adf022110445"
+    },
+    {
+      "path": "evidence/actual-no-draft-20261101/prompt.txt",
+      "bytes": 166025,
+      "sha256": "b4a94b78735c3c9b35a143419b58c9055d6adab0b52b08d7fb8229f8e55f6e59"
+    },
+    {
+      "path": "evidence/actual-no-draft-20261101/results.json",
+      "bytes": 12054,
+      "sha256": "46d70415860cdf4882388ca18b5c3ada0564a801e7db19072477de4a89dfd168"
+    },
+    {
+      "path": "evidence/published-benchmarks/2026-11-01-actual-long-context.json",
+      "bytes": 77460,
+      "sha256": "4715d63d13cd9af4d0b60e973b60c16996e885efa24356053f1a6bf0232361d9"
+    },
+    {
+      "path": "Start-Sage-A15-AntiLoop.ps1",
+      "bytes": 2816,
+      "sha256": "81d1cef617a3dbb0933818f9e6c11e47887898a2eb0f1dd22f5c102552f8317a"
+    },
+    {
+      "path": "tools/diagnose_long_context.py",
+      "bytes": 5768,
+      "sha256": "7f02b8c4125b89b2bd577b1b4dde2622c545467a6f688f1572b7265beca0bc7a"
+    },
+    {
+      "path": "tools/export_actual_numeric.py",
+      "bytes": 2162,
+      "sha256": "98b228da1f776f363edad6a3641bc889bbcad1a97f6bb6ce7d7ce89682b247a6"
+    }
+  ]
+}

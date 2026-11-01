@@ -3,6 +3,8 @@
 /.cuda/
 /evidence/
 /models/
+/sage-api-*/
+/sage-antiloop-*.json
 __pycache__/
 *.pyc
 
@@ -26,3 +28,4 @@ __pycache__/
 **/logs/
 **/*.sqlite
 **/*.db
+
