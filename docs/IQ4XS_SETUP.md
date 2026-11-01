@@ -1,5 +1,10 @@
 # Run the IQ4_XS Strata integration on Windows
 
+[繁體中文完整教學：context、KV、MTP、安裝與啟動](IQ4XS_SETUP_ZH_HK.md).
+The simple launcher accepts `-MaxContext` (default 32768), `-Threads` (16),
+and `-DraftWindow` (2/3/4, default 4). `-NoDraft` overrides the draft window.
+These controls do not qualify new context sizes or promise additional speed.
+
 This guide starts the experimental, measured profile on Windows x64 with a compatible NVIDIA GPU and a locally supplied Sage IQ4_XS GGUF. The server runs on this computer at `127.0.0.1:8080`; the model is not downloaded for you. The combined profile uses Strata's MTP draft block and an opt-in NInfer-derived expert kernel inside the same Strata process. The separate experimental RMSNorm kernel stays off.
 
 ## Start on an already prepared PC
@@ -122,6 +127,6 @@ The original repository model lock refers to a **different Q4_K_M file**, not th
 - **Missing DLL or CUDA runtime:** verify the driver and runtime required by your build, and make the corresponding DLL directory available on `PATH`. The launcher automatically adds the project-local `.cuda\bin\x64` only when present. It does not install DLLs. Reopen a PowerShell after changing system settings.
 - **Source pin or patch mismatch:** inspect `config\sources.lock.json` and run `python tools\bootstrap.py` from the project virtual environment. Preserve and review any local source edits; bootstrap intentionally refuses an unexpected source revision or divergent patches.
 - **Port 8080 already in use:** stop your own previous server with Ctrl+C and check the port with `Get-NetTCPConnection -LocalPort 8080 -State Listen`. Do not terminate another application's process without identifying it. The simple launcher binds only `127.0.0.1:8080`.
-- **GPU memory allocation or load failure:** close workloads you control, check free memory with `nvidia-smi`, and confirm that the model, KV cache and GPU match the tested configuration. A 32K configured context consumes memory; this simple launcher fixes that setting. Use the lower-level `tools\serve_sage.py --help` to choose a smaller `--max-context` for diagnosis, and revalidate performance and correctness for that configuration.
+- **GPU memory allocation or load failure:** close workloads you control and check `nvidia-smi`. Use `-MaxContext 8192` for diagnosis, then revalidate performance and correctness. KV can grow with conversation occupancy; the configured maximum is not a measurement of allocated KV or occupied tokens.
 - **Tokenizer or template error:** use a complete compatible GGUF with its own tokenizer and chat template. A failed run directory is retained; a new launch creates a different one. Do not invent a replacement template to bypass the check.
 - **PowerShell blocks scripts:** follow your organization's PowerShell execution policy; you can also invoke `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\start_iq4xs.ps1 -Model 'D:\models\Sage-IQ4_XS.gguf'` for this process if permitted. This does not change the persistent policy.

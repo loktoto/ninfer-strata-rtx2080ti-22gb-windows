@@ -2,6 +2,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$Model,
     [string]$Engine,
+    [ValidateRange(1, 2147483647)][int]$MaxContext = 32768,
+    [ValidateRange(1, 256)][int]$Threads = 16,
+    [ValidateSet(2, 3, 4)][int]$DraftWindow = 4,
     [switch]$Native,
     [switch]$NoDraft,
     [switch]$FusedNormQ8,
@@ -20,9 +23,9 @@ foreach ($item in @(@('Python', $Python), @('engine', $Engine), @('model', $Mode
     }
 }
 $ServerArgs = @((Join-Path $Root 'tools\serve_sage.py'), '--engine', (Resolve-Path -LiteralPath $Engine).Path,
-    '--model', (Resolve-Path -LiteralPath $Model).Path, '--max-context', '32768', '--threads', '16', '--cuda-graphs')
+    '--model', (Resolve-Path -LiteralPath $Model).Path, '--max-context', "$MaxContext", '--threads', "$Threads", '--cuda-graphs')
 if (-not $Native) { $ServerArgs += '--ninfer-expert-iq4xs' }
-if (-not $NoDraft) { $ServerArgs += @('--draft-window', '4') }
+if (-not $NoDraft) { $ServerArgs += @('--draft-window', "$DraftWindow") }
 if ($FusedNormQ8) { $ServerArgs += '--fused-norm-q8' }
 if ($DryRun) { $ServerArgs += '--dry-run' }
 $OriginalPath = $env:PATH
