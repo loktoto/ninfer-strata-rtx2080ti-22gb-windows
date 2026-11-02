@@ -1,0 +1,22 @@
+name: Privacy and secret hygiene
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  privacy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Scan tracked source without printing sensitive matches
+        run: python tools/privacy_scan.py
+      - name: Scanner unit tests
+        run: python -m unittest discover -s tests -p 'test_privacy_scan.py' -v
