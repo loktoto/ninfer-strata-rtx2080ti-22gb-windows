@@ -29,3 +29,29 @@ __pycache__/
 **/*.sqlite
 **/*.db
 
+# Block accidental local artifacts, models, traces and debug output.
+*.log
+*.trace
+*.dmp
+*.dump
+*.gguf
+*.safetensors
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.zip
+*.7z
+*.sqlite3
+*.db-journal
+*.envrc
+.envrc
+**/.aws/
+**/.azure/
+**/.config/gh/
+**/.git-credentials
+**/.pypirc
+**/id_rsa
+**/id_ed25519
+.DS_Store
+Thumbs.db
