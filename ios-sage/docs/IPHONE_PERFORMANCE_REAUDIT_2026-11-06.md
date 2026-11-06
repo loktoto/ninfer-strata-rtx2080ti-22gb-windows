@@ -67,6 +67,14 @@ ANEMLL `FlashMoE-iOS/REVIEW.md` 用「約 7MB/expert × 8 × 40 = 2.24GB/token�
 4. post-route parallel pread, page-aligned chunk fanout、CPU/GPU overlap、避免不必要的大型 memcpy、batch prefill。
 5. 待基本 logits parity 正確才可實驗 MTP，必須量度 draft acceptance、真實 wall time、功耗和錯誤率。
 
+### 對現有 iOS pager 原型新增的效能審核
+
+目前 `ios-sage/Sources/SagePagedExperts/Pager.swift` 使用原生 GGUF 中分開的 gate、down、up tensor 段，對每一個 selected expert 進行 **3 次 pread**；對 40 層 × 8 路由，即 **960 次 pread 呼叫 / token**（全部 miss 的情況），加上逐層同步和 CPU 串行處理。這是功能驗證用的索引器，不是經過性能調校的推理權重格式。
+
+**P0 優化：** 於安裝／離線轉換階段，將一個 expert 的 gate/up/down 量化塊與描述資料集中在固定步長、page-aligned 的 compact blob；運行時每 expert 一次讀取，降到理論 **320 次 pread / token**，同層 8 expert 讀取可批次併行。不得更改量化數值語義或跳過 expert；讀取、dequant、logit parity 和 SHA-256 是必要驗證。
+
+因 iOS 已有 OS page cache，盲目增加 app LFU 快取可能把權重複製兩次、加劇 jetsam。須比較 page-cache-only / app-LFU / hybrid hot-pin 三組，且每組記錄 process footprint、真正讀取 byte、token latency；現有 Swift pager 不應作為最終執行時的預設最快方案。
+
 ### 驗收方法
 
 **同一 iPhone**、同一 thermal state、Release build、每種設定冷/暖各≥3 次，記錄：
